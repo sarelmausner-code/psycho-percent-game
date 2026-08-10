@@ -1,0 +1,40 @@
+:root {
+  --paper: #eef3f9;
+  --grid: #dce5f0;
+  --card: #fff;
+  --ink: #14203a;
+  --ink-2: #5c6b85;
+  --line: #d9e1ec;
+  --marker: #ffd230;
+  --pen: #3b5bff;
+  --ok: #12a75e;
+  --ok-bg: #e4f7ed;
+  --no: #e0323c;
+  --no-bg: #fdeaeb;
+  --combo: #ff6b2c;
+  --glow: rgba(59, 91, 255, 0.18);
+
+  --dur-instant: 90ms;
+  --dur-fast: 180ms;
+  --dur-base: 320ms;
+  --dur-slow: 600ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-back: cubic-bezier(0.25, 1.4, 0.4, 1);
+
+  --font-display: 'Suez One', serif;
+  --font-body: 'Heebo', system-ui, sans-serif;
+  --font-num: 'Roboto Mono', ui-monospace, monospace;
+
+  --radius: 16px;
+  --shadow: 0 8px 28px rgba(20, 32, 58, 0.08);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
+}
