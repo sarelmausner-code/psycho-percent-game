@@ -665,38 +665,41 @@ button {
   line-height: 1.4;
 }
 
-.mute-fab {
-  position: absolute;
-  top: 10px;
-  left: 12px;
-  z-index: 5;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--card);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow);
-  font-size: 1.1rem;
+/* Play top bar: mute | score/timer/combo | menu — no overlays on HUD */
+.play-topbar {
   display: grid;
-  place-items: center;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+  width: 100%;
 }
 
-.menu-fab {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 5;
+.hud-icon-btn {
   width: 40px;
   height: 40px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: var(--card);
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   display: grid;
   place-items: center;
   color: var(--ink);
   font-weight: 700;
+  padding: 0;
+}
+
+.hud-icon-btn:active {
+  transform: scale(0.96);
+}
+
+/* Legacy class names kept empty so nothing floats over content */
+.mute-fab,
+.menu-fab {
+  position: static;
 }
 
 .menu-overlay {
@@ -904,11 +907,12 @@ button {
 
 .play-hud {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   position: relative;
   z-index: 1;
+  min-width: 0;
 }
 
 .hud-score {
@@ -916,8 +920,10 @@ button {
   flex-direction: column;
   align-items: flex-start;
   font-family: var(--font-display);
-  font-size: 1.55rem;
+  font-size: 1.35rem;
   line-height: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .hud-label {
@@ -939,12 +945,14 @@ button {
 .hud-combo {
   text-align: left;
   font-weight: 800;
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: var(--ink-2);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .hud-combo-on {

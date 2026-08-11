@@ -57,7 +57,7 @@ export function GameMenu({
     <>
       <button
         type="button"
-        className="menu-fab"
+        className="hud-icon-btn menu-trigger"
         onClick={open}
         aria-label={t('menu.open')}
       >

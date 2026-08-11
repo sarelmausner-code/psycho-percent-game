@@ -105,47 +105,49 @@ export function Play() {
     >
       <div className={`edge-glow ${hot ? 'edge-hot' : mid ? 'edge-mid' : ''}`} aria-hidden />
 
-      <button type="button" className="mute-fab" onClick={onMuteTap} aria-label="mute">
-        {muted ? '🔇' : '🔊'}
-      </button>
+      <header className="play-topbar">
+        <button type="button" className="hud-icon-btn" onClick={onMuteTap} aria-label="mute">
+          {muted ? '🔇' : '🔊'}
+        </button>
 
-      <GameMenu
-        onExit={onExit}
-        onRestart={() => {
-          void onRestart()
-        }}
-        onOpenChange={setMenuOpen}
-      />
+        <div className="play-hud">
+          <div className="hud-score">
+            <span className={`score-pop ${lastFeedback?.correct ? 'score-pop-go' : ''}`}>
+              <Num>{totalPoints}</Num>
+            </span>
+            <span className="hud-label">{t('play.score')}</span>
+          </div>
 
-      <header className="play-hud">
-        <div className="hud-score">
-          <span className={`score-pop ${lastFeedback?.correct ? 'score-pop-go' : ''}`}>
-            <Num>{totalPoints}</Num>
-          </span>
-          <span className="hud-label">{t('play.score')}</span>
+          <TimerRing
+            key={questionStartedAt}
+            totalSec={q.timeTargetSec}
+            startedAt={questionStartedAt}
+            paused={locked || menuOpen}
+            onHurry={onHurry}
+            onTimeout={onTimeout}
+          />
+
+          <div className={`hud-combo ${combo >= 3 ? 'hud-combo-on' : ''} ${hot ? 'hud-combo-hot' : ''}`}>
+            {combo > 0 ? (
+              <>
+                <span className="combo-fire">{hot ? '🔥' : mid ? '✨' : '⭐'}</span>
+                {t('play.combo', {
+                  n: combo >= 9 ? 4 : combo >= 6 ? 3 : combo >= 3 ? 2 : 1,
+                })}
+              </>
+            ) : (
+              '—'
+            )}
+          </div>
         </div>
 
-        <TimerRing
-          key={questionStartedAt}
-          totalSec={q.timeTargetSec}
-          startedAt={questionStartedAt}
-          paused={locked || menuOpen}
-          onHurry={onHurry}
-          onTimeout={onTimeout}
+        <GameMenu
+          onExit={onExit}
+          onRestart={() => {
+            void onRestart()
+          }}
+          onOpenChange={setMenuOpen}
         />
-
-        <div className={`hud-combo ${combo >= 3 ? 'hud-combo-on' : ''} ${hot ? 'hud-combo-hot' : ''}`}>
-          {combo > 0 ? (
-            <>
-              <span className="combo-fire">{hot ? '🔥' : mid ? '✨' : '⭐'}</span>
-              {t('play.combo', {
-                n: combo >= 9 ? 4 : combo >= 6 ? 3 : combo >= 3 ? 2 : 1,
-              })}
-            </>
-          ) : (
-            '—'
-          )}
-        </div>
       </header>
 
       <div className="q-dots" aria-hidden>
