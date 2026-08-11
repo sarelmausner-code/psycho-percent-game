@@ -132,6 +132,7 @@
   "end.title": "כל הכבוד! 🎉",
   "end.fail_title": "כמעט… נסו שוב",
   "end.fail_banner": "דיוק {pct}% — צריך לפחות {need}% כדי לפתוח את השלב הבא",
+  "end.fail_timeout": "הזמן נגמר ⏱️ — נכשלתם בשלב. נסו שוב!",
   "end.fail_stars": "0 כוכבים · השלב הבא עדיין נעול",
   "end.retry": "נסו שוב 💪",
   "end.score_label": "מדד אימון",

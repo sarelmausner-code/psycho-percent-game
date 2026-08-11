@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { bootAudio, isMuted, toggleMute } from '../audio/engine'
 import { startMusic, stopMusic } from '../audio/music'
-import { playCorrect, playHurry, playWrong } from '../audio/sfx'
+import { playCorrect, playFailSoft, playHurry, playWrong } from '../audio/sfx'
 import { GameMenu } from '../components/GameMenu'
 import { Narrative, Num } from '../components/Num'
 import { ParticleBurst } from '../components/ParticleBurst'
@@ -25,6 +25,7 @@ export function Play() {
   const currentWorldId = useGameStore((s) => s.currentWorldId)
   const goHome = useGameStore((s) => s.goHome)
   const startStage = useGameStore((s) => s.startStage)
+  const failStageOnTimeout = useGameStore((s) => s.failStageOnTimeout)
   const [muted, setMuted] = useState(isMuted)
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -40,6 +41,11 @@ export function Play() {
   const onHurry = useCallback(() => {
     if (!isMuted()) playHurry()
   }, [])
+
+  const onTimeout = useCallback(() => {
+    if (!isMuted()) playFailSoft()
+    failStageOnTimeout()
+  }, [failStageOnTimeout])
 
   function onMuteTap() {
     const next = toggleMute()
@@ -125,6 +131,7 @@ export function Play() {
           startedAt={questionStartedAt}
           paused={locked || menuOpen}
           onHurry={onHurry}
+          onTimeout={onTimeout}
         />
 
         <div className={`hud-combo ${combo >= 3 ? 'hud-combo-on' : ''} ${hot ? 'hud-combo-hot' : ''}`}>

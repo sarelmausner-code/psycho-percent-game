@@ -5,22 +5,26 @@ export function TimerRing({
   startedAt,
   paused,
   onHurry,
+  onTimeout,
 }: {
   totalSec: number
   startedAt: number
   paused: boolean
   onHurry?: () => void
+  onTimeout?: () => void
 }) {
   const [left, setLeft] = useState(totalSec)
   const [hurryFired, setHurryFired] = useState(false)
   const pausedAccum = useRef(0)
   const pauseStarted = useRef<number | null>(null)
+  const timeoutFired = useRef(false)
 
   useEffect(() => {
     setLeft(totalSec)
     setHurryFired(false)
     pausedAccum.current = 0
     pauseStarted.current = null
+    timeoutFired.current = false
   }, [startedAt, totalSec])
 
   useEffect(() => {
@@ -28,7 +32,6 @@ export function TimerRing({
       if (pauseStarted.current == null) pauseStarted.current = performance.now()
       return
     }
-    // resume: add paused duration
     if (pauseStarted.current != null) {
       pausedAccum.current += performance.now() - pauseStarted.current
       pauseStarted.current = null
@@ -43,11 +46,18 @@ export function TimerRing({
         setHurryFired(true)
         onHurry?.()
       }
-      if (remain > 0) raf = requestAnimationFrame(tick)
+      if (remain <= 0) {
+        if (!timeoutFired.current) {
+          timeoutFired.current = true
+          onTimeout?.()
+        }
+        return
+      }
+      raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [startedAt, totalSec, paused, hurryFired, onHurry])
+  }, [startedAt, totalSec, paused, hurryFired, onHurry, onTimeout])
 
   const pct = Math.max(0, Math.min(1, left / totalSec))
   const r = 22

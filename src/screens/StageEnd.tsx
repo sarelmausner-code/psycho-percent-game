@@ -94,10 +94,12 @@ function SummaryBody({ result }: { result: StageSummary }) {
 
       {!result.passed && (
         <div className="fail-banner">
-          {t('end.fail_banner', {
-            pct: Math.round(result.accuracy * 100),
-            need: 50,
-          })}
+          {result.failReason === 'timeout'
+            ? t('end.fail_timeout')
+            : t('end.fail_banner', {
+                pct: Math.round(result.accuracy * 100),
+                need: 50,
+              })}
         </div>
       )}
 

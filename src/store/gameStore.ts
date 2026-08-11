@@ -52,6 +52,8 @@ export interface StageSummary {
   score: number
   stars: 0 | 1 | 2 | 3
   passed: boolean
+  /** Why the run failed (if not passed) */
+  failReason?: 'accuracy' | 'timeout'
   maxCombo: number
   mult: number
   wasNewRecord: boolean
@@ -108,6 +110,8 @@ interface GameState {
   startStage: (worldId?: WorldId, stageId?: number) => void
   submitAnswer: (value: number, errorMode: string | undefined, clientX: number, clientY: number) => void
   advanceAfterWrong: () => void
+  /** Question timer hit 0 — fail the whole stage */
+  failStageOnTimeout: () => void
   clearBurst: () => void
 }
 
@@ -439,10 +443,27 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   clearBurst: () => set({ burst: null }),
+
+  failStageOnTimeout: () => {
+    const s = get()
+    if (s.screen !== 'play' || s.locked) return
+    // Lock so no more answers; then end as timeout fail
+    set({ locked: true, lastFeedback: null, burst: null })
+    void finishStage({ forceFail: true, failReason: 'timeout' })
+  },
 }))
 
-async function finishStage() {
+async function finishStage(opts?: {
+  forceFail?: boolean
+  failReason?: 'accuracy' | 'timeout'
+}) {
   const s = useGameStore.getState()
+  if (s.screen !== 'play' && s.screen !== 'end') {
+    // allow finish from play only; ignore double-calls after already ended
+  }
+  // Guard double finish (timer + answer race)
+  if (s.screen === 'end') return
+
   const worldId = s.currentWorldId
   const stageId = s.currentStageId ?? 1
   const def = s.currentStage ?? getStageDef(worldId, stageId)
@@ -459,8 +480,13 @@ async function finishStage() {
     s.questions.length > 0
       ? s.questions.reduce((a, q) => a + q.timeTargetSec, 0) / s.questions.length
       : 35
-  const stars = starsForStage(accuracy, avgMs, avgTarget)
-  const passed = didPassStage(accuracy)
+
+  const forceFail = opts?.forceFail === true
+  const stars = forceFail ? 0 : starsForStage(accuracy, avgMs, avgTarget)
+  const passed = forceFail ? false : didPassStage(accuracy)
+  const failReason: 'accuracy' | 'timeout' | undefined = !passed
+    ? opts?.failReason ?? 'accuracy'
+    : undefined
 
   const key = stageKey(worldId, stageId)
   const prevStars = { ...s.starsByKey }
@@ -492,6 +518,7 @@ async function finishStage() {
   })
   stageSummary.passed = passed
   stageSummary.stars = stars
+  stageSummary.failReason = failReason
   stageSummary.wasNewRecord = passed && score > prevBest
 
   try {
