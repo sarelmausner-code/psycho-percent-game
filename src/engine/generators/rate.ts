@@ -354,18 +354,22 @@ export const rateMeeting: Generator = {
       d,
     )
     const answer = distance / (v1 + v2)
-    // Keep distractors near the answer (hours), not huge "distance/speed" giveaways
-    const closingTrap =
-      v1 !== v2 ? distance / Math.abs(v1 - v2) : answer * 2
+    // Only near-miss hours (answer is usually 2–3)
     const candidates = [
-      { value: closingTrap, errorMode: 'sign_flip' },
       { value: answer + 1, errorMode: 'off_by_one' },
       { value: Math.max(1, answer - 1), errorMode: 'off_by_one' },
       { value: answer + 2, errorMode: 'guessed_round_up' },
       { value: Math.max(1, answer - 2), errorMode: 'guessed_round_up' },
-      { value: distance / ((v1 + v2) / 2) / 2, errorMode: 'arithmetic_mean_trap' },
-      { value: Math.round((v1 + v2) / distance * 10) || answer + 1, errorMode: 'inverted_ratio' },
-      { value: Math.round(distance / (v1 + v2 + 10)) || answer + 1, errorMode: 'applied_to_wrong_base' },
+      { value: Math.round(answer * 1.5) || answer + 1, errorMode: 'guessed_round_up' },
+      { value: Math.max(1, Math.round(answer * 0.5)), errorMode: 'forgot_final_step' },
+      // same direction trap only if still near band
+      {
+        value:
+          v1 !== v2 && distance / Math.abs(v1 - v2) <= answer * 2
+            ? distance / Math.abs(v1 - v2)
+            : answer + 1,
+        errorMode: 'sign_flip',
+      },
     ]
 
     return {

@@ -83,22 +83,24 @@ export function materialize(
     return true
   })
 
-  while (uniqueDistractors.length < 3) {
-    const n = uniqueDistractors.length + 1
-    const fallback = matchAnswerStyle(
-      answer + (Number.isInteger(answer) ? 10 * n : answer * 0.1 * n),
-      answer,
-    )
-    if (!seen.has(fallback) && fallback !== answer) {
+  // Near-miss fallbacks only (stay within ~2× of answer)
+  let n = 1
+  while (uniqueDistractors.length < 3 && n < 30) {
+    const step = Number.isInteger(answer)
+      ? Math.max(1, Math.round(Math.abs(answer) * 0.15 * n) || n)
+      : Math.abs(answer) * 0.12 * n
+    for (const sign of [1, -1] as const) {
+      const fallback = matchAnswerStyle(answer + sign * step, answer)
+      if (seen.has(fallback) || fallback === answer) continue
+      if (answer !== 0) {
+        const r = Math.abs(fallback / answer)
+        if (r < 0.5 || r > 2) continue
+      }
       uniqueDistractors.push({ value: fallback, errorMode: 'guessed_round_up' })
       seen.add(fallback)
-    } else {
-      uniqueDistractors.push({
-        value: matchAnswerStyle(answer - 5 * n, answer),
-        errorMode: 'guessed_round_up',
-      })
-      break
+      if (uniqueDistractors.length >= 3) break
     }
+    n++
   }
 
   const optionsRaw = [
