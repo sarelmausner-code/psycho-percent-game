@@ -317,6 +317,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         recovered: s.lastWasWrong,
         questionIndex: s.index,
         totalQuestions: s.questions.length,
+        difficulty: q.difficulty ?? 1,
         recent: s.recentPraises,
       })
       praise = picked.text

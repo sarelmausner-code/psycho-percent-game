@@ -27,9 +27,9 @@ describe('generators harness', () => {
             .filter((o) => !o.correct)
             .forEach((o) => {
               if (q.answer === 0) return
-              // Plausible band — traps should not be giveaways
-              expect(Math.abs(o.value)).toBeGreaterThan(Math.abs(q.answer) * 0.2)
-              expect(Math.abs(o.value)).toBeLessThan(Math.abs(q.answer) * 4)
+              // Near-miss band: wrong options must look tempting
+              expect(Math.abs(o.value)).toBeGreaterThan(Math.abs(q.answer) * 0.5)
+              expect(Math.abs(o.value)).toBeLessThan(Math.abs(q.answer) * 2.0)
               expect(o.errorMode).toBeTruthy()
             })
 

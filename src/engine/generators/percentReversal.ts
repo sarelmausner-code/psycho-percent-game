@@ -18,49 +18,53 @@ export const percentReversal: Generator = {
 
     const disc = pickByDifficulty(
       rng,
-      [10, 20, 25],
-      [15, 20, 30, 40],
-      [12, 18, 24, 35, 45],
+      [10, 15, 20, 25],
+      [12, 15, 20, 25, 30, 40],
+      [8, 12, 18, 24, 28, 35, 45],
       d,
     )
 
+    // Choose original so paid is not always a "pretty" round number at higher d
     const orig = pickByDifficulty(
       rng,
-      [200, 400, 500, 250],
-      [300, 360, 480, 600],
-      [280, 320, 450, 560, 720],
+      [200, 250, 300, 400, 500],
+      [240, 280, 360, 450, 600],
+      [220, 280, 320, 375, 440, 560, 720],
       d,
     )
 
     const paid = cleanNum(orig * (1 - disc / 100))
     const answer = orig
 
-    // Classic trap: add % back onto the discounted price
+    // Classic trap: add % onto discounted price — very close to truth
     const wrongBase = cleanNum(paid * (1 + disc / 100))
-    // Treat discount points as shekels
-    const shekelTrap = cleanNum(paid + disc)
-    const shekelTrap2 = cleanNum(paid + (orig * disc) / 100) // add absolute discount again
-    // Forget and use paid / (disc/100)
-    const inverted = cleanNum(paid / (disc / 100))
-    // Use 100+disc instead of 100-disc
     const signFlip = cleanNum(paid / (1 + disc / 100))
-    // Round-ish guess
-    const roundUp = cleanNum(paid * 1.25)
+    const addDiscountAbs = cleanNum(paid + (orig * disc) / 100)
+    const addPoints = cleanNum(paid + disc * 2)
+    const overDisc = cleanNum(paid / (1 - (disc + 5) / 100))
+    const underDisc = cleanNum(paid / (1 - Math.max(5, disc - 5) / 100))
+    const guess = cleanNum(paid * 1.2)
 
     const candidates = [
       { value: wrongBase, errorMode: 'applied_to_wrong_base' },
-      { value: shekelTrap2, errorMode: 'shekels_not_percent' },
-      { value: shekelTrap, errorMode: 'shekels_not_percent' },
       { value: signFlip, errorMode: 'sign_flip' },
-      { value: inverted, errorMode: 'inverted_ratio' },
-      { value: roundUp, errorMode: 'guessed_round_up' },
-      { value: cleanNum(paid / (1 - (disc + 5) / 100)), errorMode: 'forgot_final_step' },
+      { value: addDiscountAbs, errorMode: 'shekels_not_percent' },
+      { value: addPoints, errorMode: 'shekels_not_percent' },
+      { value: overDisc, errorMode: 'forgot_final_step' },
+      { value: underDisc, errorMode: 'forgot_final_step' },
+      { value: guess, errorMode: 'guessed_round_up' },
+      { value: cleanNum(paid / (disc / 100) / 10), errorMode: 'inverted_ratio' },
     ]
 
     const narratives =
       d <= 2
-        ? ['q.percent_reversal_a', 'q.percent_reversal_b']
-        : ['q.percent_reversal_b', 'q.percent_reversal_c', 'q.percent_reversal_d', 'q.percent_reversal_e']
+        ? ['q.percent_reversal_a', 'q.percent_reversal_b', 'q.percent_reversal_c']
+        : [
+            'q.percent_reversal_b',
+            'q.percent_reversal_c',
+            'q.percent_reversal_d',
+            'q.percent_reversal_e',
+          ]
 
     return {
       narrativeKey: rng.pick(narratives),
@@ -68,7 +72,7 @@ export const percentReversal: Generator = {
       answer,
       distractors: uniquePlausible(answer, candidates),
       solutionKey: 'sol.percent_reversal',
-      timeTargetSec: d <= 2 ? 36 : d <= 4 ? 42 : 48,
+      timeTargetSec: d <= 2 ? 34 : d <= 4 ? 40 : 48,
     }
   },
 }

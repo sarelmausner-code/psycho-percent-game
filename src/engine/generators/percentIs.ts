@@ -18,40 +18,45 @@ export const percentIs: Generator = {
 
     const pct = pickByDifficulty(
       rng,
-      [10, 20, 25, 50],
-      [15, 30, 40, 12],
-      [18, 24, 35, 45, 16],
+      [10, 15, 20, 25, 40, 50],
+      [12, 15, 18, 30, 35, 45],
+      [8, 16, 18, 24, 28, 32, 36],
       d,
     )
     const whole = pickByDifficulty(
       rng,
-      [100, 200, 400, 500],
-      [160, 250, 300, 450],
-      [180, 240, 360, 480],
+      [100, 200, 250, 400, 500],
+      [160, 200, 240, 300, 450],
+      [180, 250, 320, 360, 480],
       d,
     )
     const part = cleanNum((whole * pct) / 100)
     const answer = pct
 
     const candidates = [
-      { value: cleanNum((whole / part) * 10), errorMode: 'inverted_ratio' },
-      { value: cleanNum((part / whole) * 10), errorMode: 'forgot_final_step' }, // forgot *100 / off scale
       { value: cleanNum(100 - pct), errorMode: 'answered_wrong_quantity' },
-      { value: cleanNum((whole / part) * 100), errorMode: 'inverted_ratio' },
-      { value: cleanNum(part), errorMode: 'shekels_not_percent' },
       { value: cleanNum(pct + 10), errorMode: 'guessed_round_up' },
+      { value: cleanNum(Math.max(5, pct - 10)), errorMode: 'forgot_final_step' },
+      { value: cleanNum((part / whole) * 10), errorMode: 'forgot_final_step' },
+      { value: cleanNum((whole - part) / whole * 100), errorMode: 'answered_wrong_quantity' },
       { value: cleanNum((part / (whole - part)) * 100), errorMode: 'applied_to_wrong_base' },
+      { value: cleanNum((whole / part) * 10), errorMode: 'inverted_ratio' },
+      { value: cleanNum(pct * 2), errorMode: 'guessed_round_up' },
+      { value: cleanNum(Math.round(part / 10)), errorMode: 'shekels_not_percent' },
     ]
 
-    const narratives = ['q.percent_is_a', 'q.percent_is_b', 'q.percent_is_c', 'q.percent_is_d']
-
     return {
-      narrativeKey: rng.pick(narratives),
+      narrativeKey: rng.pick([
+        'q.percent_is_a',
+        'q.percent_is_b',
+        'q.percent_is_c',
+        'q.percent_is_d',
+      ]),
       params: { part, whole },
       answer,
       distractors: uniquePlausible(answer, candidates),
       solutionKey: 'sol.percent_is',
-      timeTargetSec: d <= 2 ? 34 : 40,
+      timeTargetSec: d <= 2 ? 32 : 40,
     }
   },
 }

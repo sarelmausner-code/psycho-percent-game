@@ -36,7 +36,7 @@ export const PERCENT_STAGES: StageDef[] = [
     emoji: '↩️',
     questionCount: 5,
     generators: ['percent_reversal_v1'],
-    baseDifficulty: 1,
+    baseDifficulty: 2, // start reverse already mid — classic trap skill
   },
   {
     id: 3,
@@ -53,8 +53,8 @@ export const PERCENT_STAGES: StageDef[] = [
     blurbKey: 'stage.4.blurb',
     emoji: '🔀',
     questionCount: 6,
-    generators: ['percent_of_v1', 'percent_reversal_v1', 'percent_is_v1'],
-    baseDifficulty: 2,
+    generators: ['percent_of_v1', 'percent_reversal_v1', 'percent_is_v1', 'percent_change_v1'],
+    baseDifficulty: 3,
   },
   {
     id: 5,
@@ -67,6 +67,7 @@ export const PERCENT_STAGES: StageDef[] = [
       'percent_reversal_v1',
       'percent_change_v1',
       'percent_is_v1',
+      'successive_percent_v1',
     ],
     baseDifficulty: 3,
   },
@@ -77,12 +78,12 @@ export const PERCENT_STAGES: StageDef[] = [
     emoji: '🧠',
     questionCount: 6,
     generators: [
-      'percent_reversal_v1',
       'successive_percent_v1',
+      'percent_reversal_v1',
       'percent_change_v1',
       'percent_is_v1',
     ],
-    baseDifficulty: 3,
+    baseDifficulty: 4,
   },
   {
     id: 7,
@@ -98,7 +99,7 @@ export const PERCENT_STAGES: StageDef[] = [
       'percent_is_v1',
     ],
     baseDifficulty: 4,
-    timeScale: 0.88,
+    timeScale: 0.85,
   },
   {
     id: 8,
@@ -114,7 +115,7 @@ export const PERCENT_STAGES: StageDef[] = [
       'percent_of_v1',
     ],
     baseDifficulty: 5,
-    timeScale: 0.85,
+    timeScale: 0.8,
   },
 ]
 
@@ -127,15 +128,13 @@ export function isStageUnlocked(
   starsByStage: Record<number, number>,
 ): boolean {
   if (stageId <= 1) return true
-  const prev = starsByStage[stageId - 1] ?? 0
-  return prev >= 1
+  return (starsByStage[stageId - 1] ?? 0) >= 1
 }
 
 export function recommendStageId(starsByStage: Record<number, number>): number {
   for (const stage of PERCENT_STAGES) {
     if (!isStageUnlocked(stage.id, starsByStage)) break
-    const stars = starsByStage[stage.id] ?? 0
-    if (stars < 3) return stage.id
+    if ((starsByStage[stage.id] ?? 0) < 3) return stage.id
   }
   for (let i = PERCENT_STAGES.length; i >= 1; i--) {
     if (isStageUnlocked(i, starsByStage)) return i

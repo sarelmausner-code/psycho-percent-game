@@ -18,6 +18,7 @@ export type PraiseKind =
   | 'recovery'
   | 'milestone'
   | 'progress'
+  | 'hard_clear'
   | 'standard'
 
 export function comboMultiplier(combo: number): number {
@@ -58,7 +59,7 @@ export function pointsForAnswer(
   const tier = speedTier(ms, targetSec)
   if (!correct) return { total: 0, base: 0, speed: 0, mult: 1, tier }
   const mult = comboMultiplier(comboBefore + 1)
-  const base = 90 + difficulty * 12
+  const base = 90 + difficulty * 14
   const speed = speedBonusPoints(tier)
   return { total: (base + speed) * mult, base, speed, mult, tier }
 }
@@ -75,6 +76,20 @@ export function starsForStage(accuracy: number, avgMs: number, avgTargetSec: num
 }
 
 const BANK: Record<PraiseKind, string[]> = {
+  speed_lightning: ['Lightning! ⚡', 'Pilot pilot!', 'Insane! 🚀', 'Flash!', 'Sonic!'],
+  speed_fast: ['Fast! 💨', 'Snappy!', 'High tempo!', 'Speed!', 'Sharp!'],
+  combo_hot: ['On fire! 🔥', 'Machine!', 'Unstoppable!', 'Crazy streak!', 'In the zone!'],
+  combo_mid: ['Streak lives!', 'Keep it!', 'One more!', 'Tempo up!'],
+  recovery: ['Comeback! 💪', 'Back strong!', 'Only forward!', 'Clean fix!'],
+  milestone: ['Checkpoint! ⭐', 'Level up feel!', 'Progress!', 'Stepping up!'],
+  progress: ['Step forward!', 'Learning!', 'Getting better!', 'Brick in the wall!'],
+  hard_clear: ['Tough one! 🧠', 'Hard mode OK!', 'Brain win!', 'Clutch!'],
+  standard: ['Nailed it!', 'Nice!', 'Easy for you!', 'Great!', 'Sharp!', 'Champ!', 'Correct!', 'Well done!'],
+}
+
+// Hebrew UI still uses Hebrew copy in he.json for questions; praise can stay mixed.
+// Keep Hebrew variants for in-game feel matching the app language:
+const BANK_HE: Record<PraiseKind, string[]> = {
   speed_lightning: ['ברק! ⚡', 'טייס!', 'מטורף! 🚀', 'הבזק!', 'סופר-סאוני!'],
   speed_fast: ['מהיר! 💨', 'זריז!', 'קצב גבוה!', 'ספיד!', 'חד כמו סכין!'],
   combo_hot: ['בוער! 🔥', 'מכונה!', 'אין עליך!', 'רצף מטורף!', 'על הגל!'],
@@ -82,6 +97,7 @@ const BANK: Record<PraiseKind, string[]> = {
   recovery: ['קאמבק! 💪', 'חזרת חזק!', 'מכאן רק קדימה!', 'תיקון מושלם!'],
   milestone: ['ציון דרך! ⭐', 'רמה למעלה!', 'התקדמות!', 'עולים מדרגה!'],
   progress: ['צעד קדימה!', 'לומדים!', 'השתפרת!', 'עוד לבנה בחומה!'],
+  hard_clear: ['קשה — ועברת! 🧠', 'שאלה כבדה!', 'ראש טוב!', 'קלאץ׳!'],
   standard: ['בול!', 'יפה!', 'קטן עליך!', 'מצוין!', 'חד!', 'אלוף!', 'נכון!', 'כל הכבוד!'],
 }
 
@@ -91,12 +107,22 @@ export function pickPraiseDetailed(input: {
   recovered: boolean
   questionIndex: number
   totalQuestions: number
+  difficulty?: number
   recent?: string[]
 }): { text: string; kind: PraiseKind } {
-  const { combo, tier, recovered, questionIndex, totalQuestions, recent = [] } = input
+  const {
+    combo,
+    tier,
+    recovered,
+    questionIndex,
+    totalQuestions,
+    difficulty = 1,
+    recent = [],
+  } = input
 
   let kind: PraiseKind = 'standard'
   if (recovered) kind = 'recovery'
+  else if (difficulty >= 4 && tier !== 'slow') kind = 'hard_clear'
   else if (tier === 'lightning') kind = 'speed_lightning'
   else if (tier === 'fast') kind = 'speed_fast'
   else if (combo >= 6) kind = 'combo_hot'
@@ -104,11 +130,10 @@ export function pickPraiseDetailed(input: {
   else if (questionIndex > 0 && (questionIndex + 1) % 3 === 0) kind = 'milestone'
   else if (questionIndex >= Math.floor(totalQuestions * 0.5)) kind = 'progress'
 
-  const pool = BANK[kind]
-  // Avoid immediate repeats
+  const pool = BANK_HE[kind]
   const fresh = pool.filter((p) => !recent.includes(p))
   const list = fresh.length ? fresh : pool
-  const text = list[(combo + questionIndex) % list.length]!
+  const text = list[(combo + questionIndex + difficulty) % list.length]!
   return { text, kind }
 }
 
@@ -122,5 +147,8 @@ export function pickPraise(combo: number, tier: SpeedTier): string {
   }).text
 }
 
-export const PRAISE_WORDS = BANK.standard
-export const HOT_PRAISE = BANK.combo_hot
+export const PRAISE_WORDS = BANK_HE.standard
+export const HOT_PRAISE = BANK_HE.combo_hot
+
+// silence unused EN bank warning if tree-shaken poorly
+void BANK
