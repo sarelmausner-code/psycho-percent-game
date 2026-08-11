@@ -21,6 +21,14 @@ export type GeneratorId =
   | 'mean_weighted_v1'
   | 'mean_needed_v1'
   | 'mean_remove_v1'
+  // rate / work
+  | 'rate_speed_v1'
+  | 'rate_time_v1'
+  | 'rate_distance_v1'
+  | 'rate_avg_speed_v1'
+  | 'rate_work_alone_v1'
+  | 'rate_work_together_v1'
+  | 'rate_meeting_v1'
 
 export interface StageDef {
   id: number
@@ -343,6 +351,106 @@ const AVERAGE_STAGES: StageDef[] = [
   },
 ]
 
+// ——— Rate & work ———
+const RATE_STAGES: StageDef[] = [
+  {
+    id: 1,
+    worldId: 'rate',
+    titleKey: 'rate.stage.1.title',
+    blurbKey: 'rate.stage.1.blurb',
+    emoji: '🌱',
+    questionCount: 5,
+    generators: ['rate_speed_v1'],
+    baseDifficulty: 1,
+  },
+  {
+    id: 2,
+    worldId: 'rate',
+    titleKey: 'rate.stage.2.title',
+    blurbKey: 'rate.stage.2.blurb',
+    emoji: '⏳',
+    questionCount: 5,
+    generators: ['rate_time_v1'],
+    baseDifficulty: 2,
+  },
+  {
+    id: 3,
+    worldId: 'rate',
+    titleKey: 'rate.stage.3.title',
+    blurbKey: 'rate.stage.3.blurb',
+    emoji: '🛣️',
+    questionCount: 5,
+    generators: ['rate_distance_v1'],
+    baseDifficulty: 2,
+  },
+  {
+    id: 4,
+    worldId: 'rate',
+    titleKey: 'rate.stage.4.title',
+    blurbKey: 'rate.stage.4.blurb',
+    emoji: '🔀',
+    questionCount: 6,
+    generators: ['rate_speed_v1', 'rate_time_v1', 'rate_distance_v1'],
+    baseDifficulty: 3,
+  },
+  {
+    id: 5,
+    worldId: 'rate',
+    titleKey: 'rate.stage.5.title',
+    blurbKey: 'rate.stage.5.blurb',
+    emoji: '📊',
+    questionCount: 6,
+    generators: ['rate_avg_speed_v1'],
+    baseDifficulty: 3,
+  },
+  {
+    id: 6,
+    worldId: 'rate',
+    titleKey: 'rate.stage.6.title',
+    blurbKey: 'rate.stage.6.blurb',
+    emoji: '🛠️',
+    questionCount: 6,
+    generators: ['rate_work_alone_v1', 'rate_work_together_v1'],
+    baseDifficulty: 4,
+  },
+  {
+    id: 7,
+    worldId: 'rate',
+    titleKey: 'rate.stage.7.title',
+    blurbKey: 'rate.stage.7.blurb',
+    emoji: '🚗',
+    questionCount: 7,
+    generators: [
+      'rate_meeting_v1',
+      'rate_avg_speed_v1',
+      'rate_work_together_v1',
+      'rate_speed_v1',
+      'rate_time_v1',
+    ],
+    baseDifficulty: 4,
+    timeScale: 0.88,
+  },
+  {
+    id: 8,
+    worldId: 'rate',
+    titleKey: 'rate.stage.8.title',
+    blurbKey: 'rate.stage.8.blurb',
+    emoji: '🏆',
+    questionCount: 8,
+    generators: [
+      'rate_meeting_v1',
+      'rate_work_together_v1',
+      'rate_avg_speed_v1',
+      'rate_work_alone_v1',
+      'rate_distance_v1',
+      'rate_speed_v1',
+      'rate_time_v1',
+    ],
+    baseDifficulty: 5,
+    timeScale: 0.82,
+  },
+]
+
 export const WORLDS: WorldDef[] = [
   {
     id: 'percentages',
@@ -369,18 +477,18 @@ export const WORLDS: WorldDef[] = [
     stages: AVERAGE_STAGES,
   },
   {
-    id: 'fractions',
-    titleKey: 'world.fractions.title',
-    blurbKey: 'world.fractions.blurb',
-    emoji: '➗',
-    status: 'coming',
-    stages: [],
-  },
-  {
     id: 'rate',
     titleKey: 'world.rate.title',
     blurbKey: 'world.rate.blurb',
     emoji: '⏱️',
+    status: 'live',
+    stages: RATE_STAGES,
+  },
+  {
+    id: 'fractions',
+    titleKey: 'world.fractions.title',
+    blurbKey: 'world.fractions.blurb',
+    emoji: '➗',
     status: 'coming',
     stages: [],
   },
@@ -430,7 +538,8 @@ export function worldCompletedStages(worldId: WorldId, starsByKey: Record<string
  * Soft unlock:
  * - percentages: always
  * - ratios: % stage 4 done OR 8★ in %
- * - averages: ratios stage 3 done OR 6★ in ratios OR % stage 6 done
+ * - averages: ratios stage 3 OR 6★ ratios OR % stage 6
+ * - rate: averages stage 3 OR 6★ averages OR ratios stage 6
  * - coming worlds: never
  */
 export function isWorldUnlocked(worldId: WorldId, starsByKey: Record<string, number>): boolean {
@@ -448,6 +557,13 @@ export function isWorldUnlocked(worldId: WorldId, starsByKey: Record<string, num
       (starsByKey[stageKey('ratios', 3)] ?? 0) >= 1 ||
       worldStars('ratios', starsByKey) >= 6 ||
       (starsByKey[stageKey('percentages', 6)] ?? 0) >= 1
+    )
+  }
+  if (worldId === 'rate') {
+    return (
+      (starsByKey[stageKey('averages', 3)] ?? 0) >= 1 ||
+      worldStars('averages', starsByKey) >= 6 ||
+      (starsByKey[stageKey('ratios', 6)] ?? 0) >= 1
     )
   }
   return false
@@ -474,7 +590,7 @@ export function recommendTarget(starsByKey: Record<string, number>): {
   worldId: WorldId
   stageId: number
 } {
-  const order: WorldId[] = ['percentages', 'ratios', 'averages']
+  const order: WorldId[] = ['percentages', 'ratios', 'averages', 'rate']
   for (const wid of order) {
     if (!isWorldUnlocked(wid, starsByKey)) continue
     const sid = recommendInWorld(wid, starsByKey)

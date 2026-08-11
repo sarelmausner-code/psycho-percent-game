@@ -40,6 +40,21 @@ export function verifyIndependently(
     case 'mean_remove_v1':
       return (p.mean! * p.n! - p.removed!) / (p.n! - 1)
 
+    case 'rate_speed_v1':
+      return p.distance! / p.time!
+    case 'rate_time_v1':
+      return p.distance! / p.speed!
+    case 'rate_distance_v1':
+      return p.speed! * p.time!
+    case 'rate_avg_speed_v1':
+      return (2 * p.a! * p.b!) / (p.a! + p.b!)
+    case 'rate_work_alone_v1':
+      return p.days! * p.jobs!
+    case 'rate_work_together_v1':
+      return (p.a! * p.b!) / (p.a! + p.b!)
+    case 'rate_meeting_v1':
+      return p.distance! / (p.v1! + p.v2!)
+
     default:
       return q.answer
   }

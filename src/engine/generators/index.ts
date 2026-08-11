@@ -20,6 +20,15 @@ import {
   meanNeeded,
   meanRemove,
 } from './averages'
+import {
+  rateSpeed,
+  rateTime,
+  rateDistance,
+  rateAvgSpeed,
+  rateWorkAlone,
+  rateWorkTogether,
+  rateMeeting,
+} from './rate'
 
 export const ALL_GENERATORS: Generator[] = [
   percentOf,
@@ -37,6 +46,13 @@ export const ALL_GENERATORS: Generator[] = [
   meanWeighted,
   meanNeeded,
   meanRemove,
+  rateSpeed,
+  rateTime,
+  rateDistance,
+  rateAvgSpeed,
+  rateWorkAlone,
+  rateWorkTogether,
+  rateMeeting,
 ]
 
 export const LABELS = ['א', 'ב', 'ג', 'ד'] as const
@@ -189,4 +205,11 @@ export {
   meanWeighted,
   meanNeeded,
   meanRemove,
+  rateSpeed,
+  rateTime,
+  rateDistance,
+  rateAvgSpeed,
+  rateWorkAlone,
+  rateWorkTogether,
+  rateMeeting,
 }
