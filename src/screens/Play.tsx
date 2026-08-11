@@ -119,23 +119,37 @@ export function Play() {
       </header>
 
       <div className="q-dots" aria-hidden>
-        {questions.map((_, i) => (
+        {questions.map((qq, i) => (
           <span
             key={i}
-            className={`q-dot ${i < index ? 'done' : ''} ${i === index ? 'current' : ''}`}
+            className={`q-dot ${i < index ? 'done' : ''} ${i === index ? 'current' : ''} ${qq.difficulty >= 4 ? 'hard' : ''}`}
+            title={`d${qq.difficulty}`}
           />
         ))}
+      </div>
+
+      <div className="progress-track" aria-hidden>
+        <div
+          className="progress-fill"
+          style={{ width: `${((index + (locked && lastFeedback?.correct ? 1 : 0)) / questions.length) * 100}%` }}
+        />
       </div>
 
       <div className="combo-bar" aria-hidden>
         <div className="combo-fill" style={{ width: `${Math.min(100, (combo / 9) * 100)}%` }} />
       </div>
 
-      <article className={`question-card ${hot ? 'question-hot' : ''}`}>
-        <div className="q-badge">
-          {currentStage
-            ? `${currentStage.emoji} ${t('map.stage_n', { n: currentStageId ?? 1 })} · ${index + 1}/${questions.length}`
-            : `${t('play.q_of', { n: index + 1, total: questions.length })}`}
+      <article className={`question-card ${hot ? 'question-hot' : ''} ${q.difficulty >= 4 ? 'question-hard' : ''}`}>
+        <div className="q-badge-row">
+          <div className="q-badge">
+            {currentStage
+              ? `${currentStage.emoji} ${t('map.stage_n', { n: currentStageId ?? 1 })} · ${index + 1}/${questions.length}`
+              : `${t('play.q_of', { n: index + 1, total: questions.length })}`}
+          </div>
+          <div className={`diff-chip d${Math.min(5, q.difficulty || 1)}`}>
+            {t('play.diff', { n: q.difficulty || 1 })}
+            {index >= Math.floor(questions.length * 0.6) ? ` · ${t('play.ramp')}` : ''}
+          </div>
         </div>
         <p className="question-text">
           <Narrative template={t(q.narrativeKey)} params={q.params} />
@@ -173,7 +187,7 @@ export function Play() {
 
       {lastFeedback?.correct && lastFeedback.praise && (
         <div
-          className={`praise ${lastFeedback.speedTier === 'lightning' ? 'praise-lightning' : ''} ${lastFeedback.speedTier === 'fast' ? 'praise-fast' : ''}`}
+          className={`praise ${lastFeedback.speedTier === 'lightning' ? 'praise-lightning' : ''} ${lastFeedback.speedTier === 'fast' ? 'praise-fast' : ''} ${lastFeedback.praiseKind === 'recovery' ? 'praise-recovery' : ''} ${lastFeedback.praiseKind === 'milestone' || lastFeedback.praiseKind === 'progress' ? 'praise-milestone' : ''}`}
           key={lastFeedback.praise + index}
         >
           <span className="praise-word">{lastFeedback.praise}</span>

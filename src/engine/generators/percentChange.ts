@@ -1,5 +1,11 @@
 import type { Generator } from '../types'
 import type { RNG } from '../rng'
+import {
+  cleanNum,
+  pickByDifficulty,
+  type Difficulty,
+  uniquePlausible,
+} from '../difficulty'
 
 /** From old to new — what % change? */
 export const percentChange: Generator = {
@@ -7,45 +13,65 @@ export const percentChange: Generator = {
   topic: 'percentages',
   subtopic: 'percent_change',
 
-  generate(rng: RNG) {
-    const oldVal = rng.pick([100, 150, 200, 250, 400, 500])
-    const changePct = rng.pick([10, 20, 25, 40, 50])
-    const up = rng.pick([true, false])
-    const newVal = up
-      ? oldVal * (1 + changePct / 100)
-      : oldVal * (1 - changePct / 100)
-    const absAnswer = changePct
+  generate(rng: RNG, difficulty = 1) {
+    const d = Math.max(1, Math.min(5, difficulty)) as Difficulty
 
-    const wrongBase = Math.round((Math.abs(newVal - oldVal) / newVal) * 100)
-    const shekelTrap = Math.round(Math.abs(newVal - oldVal) / (oldVal / 20)) // scaled into band
-    const signish = absAnswer === 10 ? 20 : absAnswer - 5
+    const oldVal = pickByDifficulty(
+      rng,
+      [100, 200, 400, 500],
+      [150, 250, 300, 450],
+      [160, 240, 320, 375, 480],
+      d,
+    )
+
+    const changePct = pickByDifficulty(
+      rng,
+      [10, 20, 25, 50],
+      [15, 20, 30, 40],
+      [12, 18, 24, 35, 45],
+      d,
+    )
+
+    const up = rng.pick([true, false])
+    const newVal = cleanNum(up ? oldVal * (1 + changePct / 100) : oldVal * (1 - changePct / 100))
+    const answer = changePct
+
+    // Divide by new instead of old
+    const wrongBase = cleanNum((Math.abs(newVal - oldVal) / newVal) * 100)
+    // Absolute difference as if it were percent
+    const shekelAsPct = cleanNum(Math.abs(newVal - oldVal))
+    // 100 - change or inverse direction magnitude
+    const signish = cleanNum(100 - changePct)
+    // Additive vs relative
+    const additive = cleanNum(changePct + (up ? 10 : 5))
+    // (new/old)*100 instead of change
+    const ratioTrap = cleanNum((newVal / oldVal) * 100)
+
+    const candidates = [
+      { value: wrongBase, errorMode: 'applied_to_wrong_base' },
+      { value: shekelAsPct, errorMode: 'shekels_not_percent' },
+      { value: signish, errorMode: 'sign_flip' },
+      { value: additive, errorMode: 'additive_percent' },
+      { value: ratioTrap, errorMode: 'forgot_final_step' },
+      { value: cleanNum(changePct / 2), errorMode: 'forgot_final_step' },
+      { value: cleanNum(Math.abs(newVal - oldVal) / 10), errorMode: 'guessed_round_up' },
+    ]
+
+    const narratives = up
+      ? d <= 2
+        ? ['q.percent_change_up_a', 'q.percent_change_up_b']
+        : ['q.percent_change_up_b', 'q.percent_change_up_c', 'q.percent_change_up_d']
+      : d <= 2
+        ? ['q.percent_change_down_a', 'q.percent_change_down_b']
+        : ['q.percent_change_down_b', 'q.percent_change_down_c', 'q.percent_change_down_d']
 
     return {
-      narrativeKey: up ? 'q.percent_change_up' : 'q.percent_change_down',
+      narrativeKey: rng.pick(narratives),
       params: { oldVal, newVal },
-      answer: absAnswer,
-      distractors: [
-        { value: clampBand(shekelTrap || absAnswer + 5, absAnswer), errorMode: 'shekels_not_percent' },
-        { value: clampBand(wrongBase || absAnswer + 8, absAnswer), errorMode: 'applied_to_wrong_base' },
-        { value: clampBand(signish, absAnswer), errorMode: 'sign_flip' },
-      ],
+      answer,
+      distractors: uniquePlausible(answer, candidates),
       solutionKey: 'sol.percent_change',
-      timeTargetSec: 35,
+      timeTargetSec: d <= 2 ? 36 : d <= 4 ? 42 : 46,
     }
   },
-}
-
-function round2(n: number) {
-  return Math.round(n * 100) / 100
-}
-
-function clampBand(v: number, answer: number): number {
-  let x = round2(v)
-  const lo = round2(Math.abs(answer) * 0.35)
-  const hi = round2(Math.abs(answer) * 2.9)
-  if (x === answer) x = round2(answer * 1.25)
-  if (Math.abs(x) < lo) x = lo === answer ? round2(answer * 1.4) : lo
-  if (Math.abs(x) > hi) x = hi === answer ? round2(answer * 0.6) : hi
-  if (x === answer) x = round2(answer + Math.max(1, Math.abs(answer) * 0.2))
-  return x
 }

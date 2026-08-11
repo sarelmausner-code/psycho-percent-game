@@ -16,7 +16,7 @@ export interface Generator {
   id: string
   topic: string
   subtopic: string
-  generate: (rng: import('./rng').RNG) => GeneratorResult
+  generate: (rng: import('./rng').RNG, difficulty?: number) => GeneratorResult
 }
 
 export interface Option {
@@ -37,6 +37,7 @@ export interface GeneratedQuestion {
   solutionKey: string
   timeTargetSec: number
   seed: number
+  difficulty: number
 }
 
 export interface AnswerRecord {

@@ -6,12 +6,9 @@ export function verifyIndependently(
   q: Pick<GeneratorResult, 'params' | 'answer' | 'narrativeKey'>,
 ): number {
   switch (generatorId) {
-    case 'percent_of_v1': {
-      // Generator: base * pct / 100. Verify: (pct/100) * base
+    case 'percent_of_v1':
       return (q.params.pct! / 100) * q.params.base!
-    }
     case 'percent_reversal_v1': {
-      // Generator: paid = orig * (1 - disc/100) → orig = paid / (1 - disc/100)
       const remaining = 1 - q.params.disc! / 100
       return q.params.paid! / remaining
     }
@@ -19,6 +16,12 @@ export function verifyIndependently(
       const oldVal = q.params.oldVal!
       const newVal = q.params.newVal!
       return Math.round((Math.abs(newVal - oldVal) / oldVal) * 100)
+    }
+    case 'percent_is_v1':
+      return Math.round((q.params.part! / q.params.whole!) * 100)
+    case 'successive_percent_v1': {
+      const { start, a, b } = q.params
+      return start! * (1 - a! / 100) * (1 - b! / 100)
     }
     default:
       return q.answer

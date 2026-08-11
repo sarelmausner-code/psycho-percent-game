@@ -10,10 +10,11 @@ import {
 } from '../engine/stages'
 import {
   comboMultiplier,
-  pickPraise,
+  pickPraiseDetailed,
   pointsForAnswer,
   starsForStage,
   toTrainingScore,
+  type PraiseKind,
   type SpeedTier,
 } from '../engine/scoring'
 import type { AnswerRecord, GeneratedQuestion } from '../engine/types'
@@ -71,6 +72,7 @@ interface GameState {
     value: number
     points: number
     praise?: string
+    praiseKind?: PraiseKind
     speedTier?: SpeedTier
     speedBonus?: number
     ms?: number
@@ -84,6 +86,8 @@ interface GameState {
   currentStageId: number | null
   currentStage: StageDef | null
   recommendId: number
+  lastWasWrong: boolean
+  recentPraises: string[]
 
   hydrate: () => Promise<void>
   openMap: () => void
@@ -189,6 +193,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   currentStageId: null,
   currentStage: null,
   recommendId: 1,
+  lastWasWrong: false,
+  recentPraises: [],
 
   hydrate: async () => {
     try {
@@ -242,6 +248,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       def.questionCount,
       seed,
       def.timeScale ?? 1,
+      def.baseDifficulty,
     )
 
     stopMusic()
@@ -264,6 +271,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       stageSummary: null,
       currentStageId: id,
       currentStage: def,
+      lastWasWrong: false,
+      recentPraises: [],
     })
   },
 
@@ -275,7 +284,13 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const ms = performance.now() - s.questionStartedAt
     const correct = value === q.answer
-    const scored = pointsForAnswer(correct, s.combo, ms, q.timeTargetSec)
+    const scored = pointsForAnswer(
+      correct,
+      s.combo,
+      ms,
+      q.timeTargetSec,
+      q.difficulty ?? 1,
+    )
     const nextCombo = correct ? s.combo + 1 : 0
 
     const record: AnswerRecord = {
@@ -291,7 +306,23 @@ export const useGameStore = create<GameState>((set, get) => ({
     const maxCombo = Math.max(s.maxCombo, nextCombo)
     const lightningCount =
       s.lightningCount + (correct && scored.tier === 'lightning' ? 1 : 0)
-    const praise = correct ? pickPraise(nextCombo, scored.tier) : undefined
+
+    let praise: string | undefined
+    let praiseKind: PraiseKind | undefined
+    let recentPraises = s.recentPraises
+    if (correct) {
+      const picked = pickPraiseDetailed({
+        combo: nextCombo,
+        tier: scored.tier,
+        recovered: s.lastWasWrong,
+        questionIndex: s.index,
+        totalQuestions: s.questions.length,
+        recent: s.recentPraises,
+      })
+      praise = picked.text
+      praiseKind = picked.kind
+      recentPraises = [...s.recentPraises, praise].slice(-6)
+    }
 
     setMusicCombo(nextCombo)
 
@@ -302,12 +333,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       totalPoints,
       answers,
       lightningCount,
+      lastWasWrong: !correct,
+      recentPraises,
       lastFeedback: {
         correct,
         errorMode,
         value,
         points: scored.total,
         praise,
+        praiseKind,
         speedTier: scored.tier,
         speedBonus: scored.speed * scored.mult,
         ms,

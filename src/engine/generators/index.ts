@@ -1,26 +1,42 @@
 import { RNG } from '../rng'
+import { cleanNum, questionDifficulty } from '../difficulty'
 import type { GeneratedQuestion, Generator, Option } from '../types'
 import { percentOf } from './percentOf'
 import { percentReversal } from './percentReversal'
 import { percentChange } from './percentChange'
+import { percentIs } from './percentIs'
+import { successivePercent } from './successivePercent'
 
-export const ALL_GENERATORS: Generator[] = [percentOf, percentReversal, percentChange]
+export const ALL_GENERATORS: Generator[] = [
+  percentOf,
+  percentReversal,
+  percentChange,
+  percentIs,
+  successivePercent,
+]
 
 export const LABELS = ['א', 'ב', 'ג', 'ד'] as const
 
-export function materialize(gen: Generator, seed: number): GeneratedQuestion {
+export function materialize(
+  gen: Generator,
+  seed: number,
+  difficulty = 1,
+): GeneratedQuestion {
   const rng = new RNG(seed)
-  const raw = gen.generate(rng)
+  // Retry a few seeds if distractors collapse (rare)
+  let raw = gen.generate(rng, difficulty)
+  let attempt = 0
+  while (raw.distractors.length < 3 && attempt < 8) {
+    attempt++
+    raw = gen.generate(new RNG(seed + attempt * 7919), difficulty)
+  }
 
-  // Ensure distractors don't collide with answer; tweak if needed
-  const distractors = raw.distractors.map((d) => {
-    let v = cleanNum(d.value)
-    if (v === raw.answer) v = cleanNum(v + (v === 0 ? 1 : Math.sign(v) || 1))
-    return { ...d, value: v }
-  })
+  const distractors = raw.distractors.map((d) => ({
+    ...d,
+    value: cleanNum(d.value),
+  }))
 
-  // Dedupe distractor values
-  const seen = new Set<number>([raw.answer])
+  const seen = new Set<number>([cleanNum(raw.answer)])
   const uniqueDistractors = distractors.filter((d) => {
     if (seen.has(d.value)) return false
     seen.add(d.value)
@@ -28,15 +44,17 @@ export function materialize(gen: Generator, seed: number): GeneratedQuestion {
   })
 
   while (uniqueDistractors.length < 3) {
-    const fallback = cleanNum(raw.answer * (0.5 + uniqueDistractors.length * 0.3))
+    const n = uniqueDistractors.length + 1
+    const fallback = cleanNum(raw.answer * (0.8 + n * 0.12))
     if (!seen.has(fallback) && fallback !== raw.answer) {
       uniqueDistractors.push({ value: fallback, errorMode: 'guessed_round_up' })
       seen.add(fallback)
     } else {
       uniqueDistractors.push({
-        value: cleanNum(raw.answer + 10 + uniqueDistractors.length * 5),
+        value: cleanNum(raw.answer + 5 * n),
         errorMode: 'guessed_round_up',
       })
+      break
     }
   }
 
@@ -66,6 +84,7 @@ export function materialize(gen: Generator, seed: number): GeneratedQuestion {
     solutionKey: raw.solutionKey,
     timeTargetSec: raw.timeTargetSec,
     seed,
+    difficulty,
   }
 }
 
@@ -73,7 +92,8 @@ export function buildStageQuestions(count: number, baseSeed: number): GeneratedQ
   const questions: GeneratedQuestion[] = []
   for (let i = 0; i < count; i++) {
     const gen = ALL_GENERATORS[i % ALL_GENERATORS.length]!
-    questions.push(materialize(gen, baseSeed + i * 9973))
+    const diff = questionDifficulty(1, i, count)
+    questions.push(materialize(gen, baseSeed + i * 9973, diff))
   }
   return questions
 }
@@ -82,30 +102,51 @@ const BY_ID: Record<string, Generator> = Object.fromEntries(
   ALL_GENERATORS.map((g) => [g.id, g]),
 )
 
-/** Build questions from a stage plan (generator id list + count). */
+/** Build questions from a stage plan with ramping difficulty. */
 export function buildStageQuestionsFromPlan(
   generatorIds: string[],
   count: number,
   baseSeed: number,
   timeScale = 1,
+  stageBaseDifficulty = 1,
 ): GeneratedQuestion[] {
   const pool = generatorIds.length ? generatorIds : ALL_GENERATORS.map((g) => g.id)
+  // Shuffle pool order per stage so patterns don't feel fixed
+  const orderRng = new RNG(baseSeed ^ 0x9e3779b9)
+  const shuffledPool = orderRng.shuffle(pool)
+
   const questions: GeneratedQuestion[] = []
+  const usedFingerprints = new Set<string>()
+
   for (let i = 0; i < count; i++) {
-    const id = pool[i % pool.length]!
+    const id = shuffledPool[i % shuffledPool.length]!
     const gen = BY_ID[id] ?? ALL_GENERATORS[i % ALL_GENERATORS.length]!
-    const q = materialize(gen, baseSeed + i * 9973 + gen.id.length * 17)
+    const diff = questionDifficulty(stageBaseDifficulty, i, count)
+
+    let q: GeneratedQuestion | null = null
+    for (let tryN = 0; tryN < 12; tryN++) {
+      const seed = baseSeed + i * 9973 + gen.id.length * 17 + tryN * 1301
+      const candidate = materialize(gen, seed, diff)
+      const fp = `${candidate.generatorId}:${candidate.narrativeKey}:${JSON.stringify(candidate.params)}`
+      if (usedFingerprints.has(fp)) continue
+      usedFingerprints.add(fp)
+      q = candidate
+      break
+    }
+    if (!q) {
+      q = materialize(gen, baseSeed + i * 9973, diff)
+    }
+
     if (timeScale !== 1) {
-      q.timeTargetSec = Math.max(18, Math.round(q.timeTargetSec * timeScale))
+      q.timeTargetSec = Math.max(16, Math.round(q.timeTargetSec * timeScale))
+    }
+    // Slightly tighter time on later items in stage
+    if (i >= Math.floor(count * 0.6)) {
+      q.timeTargetSec = Math.max(16, Math.round(q.timeTargetSec * 0.92))
     }
     questions.push(q)
   }
   return questions
 }
 
-function cleanNum(n: number): number {
-  const r = Math.round(n * 100) / 100
-  return Object.is(r, -0) ? 0 : r
-}
-
-export { percentOf, percentReversal, percentChange }
+export { percentOf, percentReversal, percentChange, percentIs, successivePercent }

@@ -767,6 +767,70 @@ button {
   box-shadow: 0 0 0 3px rgba(59, 91, 255, 0.2);
 }
 
+.q-dot.hard {
+  outline: 1.5px solid var(--combo);
+}
+
+.progress-track {
+  height: 5px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ok), var(--pen));
+  border-radius: 999px;
+  transition: width var(--dur-base) var(--ease-out);
+}
+
+.q-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: -4px 0 8px;
+}
+
+.q-badge-row .q-badge {
+  position: static;
+}
+
+.diff-chip {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: var(--pen);
+}
+
+.diff-chip.d3 {
+  background: #fff4e0;
+  color: #b86e00;
+}
+
+.diff-chip.d4,
+.diff-chip.d5 {
+  background: #ffe8e0;
+  color: var(--combo);
+}
+
+.question-hard {
+  border-color: #ffc9a8;
+}
+
+.praise-recovery .praise-word {
+  color: var(--ok);
+}
+
+.praise-milestone .praise-word {
+  color: #7c3aed;
+}
+
 .combo-bar {
   height: 8px;
   background: var(--line);

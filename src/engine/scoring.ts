@@ -10,6 +10,16 @@ export const TIMING = {
 
 export type SpeedTier = 'lightning' | 'fast' | 'ok' | 'slow'
 
+export type PraiseKind =
+  | 'speed_lightning'
+  | 'speed_fast'
+  | 'combo_hot'
+  | 'combo_mid'
+  | 'recovery'
+  | 'milestone'
+  | 'progress'
+  | 'standard'
+
 export function comboMultiplier(combo: number): number {
   if (combo >= 9) return 4
   if (combo >= 6) return 3
@@ -17,7 +27,6 @@ export function comboMultiplier(combo: number): number {
   return 1
 }
 
-/** Lightning < 35% of target · Fast < 55% · Ok under target · else slow */
 export function speedTier(ms: number, targetSec: number): SpeedTier {
   const ratio = ms / (targetSec * 1000)
   if (ratio < 0.35) return 'lightning'
@@ -44,18 +53,18 @@ export function pointsForAnswer(
   comboBefore: number,
   ms: number,
   targetSec: number,
+  difficulty = 1,
 ): { total: number; base: number; speed: number; mult: number; tier: SpeedTier } {
   const tier = speedTier(ms, targetSec)
   if (!correct) return { total: 0, base: 0, speed: 0, mult: 1, tier }
   const mult = comboMultiplier(comboBefore + 1)
-  const base = 100
+  const base = 90 + difficulty * 12
   const speed = speedBonusPoints(tier)
   return { total: (base + speed) * mult, base, speed, mult, tier }
 }
 
-/** Demo training score skin — not an official PET score. */
 export function toTrainingScore(totalPoints: number, accuracy: number): number {
-  const raw = 200 + Math.round(totalPoints * 0.3 + accuracy * 250)
+  const raw = 200 + Math.round(totalPoints * 0.28 + accuracy * 250)
   return Math.max(200, Math.min(800, raw))
 }
 
@@ -65,18 +74,53 @@ export function starsForStage(accuracy: number, avgMs: number, avgTargetSec: num
   return 1
 }
 
-export function pickPraise(combo: number, tier: SpeedTier): string {
-  if (tier === 'lightning') {
-    return ['ברק! ⚡', 'טייס!', 'מטורף! 🚀', 'הבזק!'][combo % 4]!
-  }
-  if (tier === 'fast') {
-    return ['מהיר! 💨', 'זריז!', 'קצב גבוה!', 'ספיד!'][combo % 4]!
-  }
-  if (combo >= 6) {
-    return ['בוער! 🔥', 'מכונה!', 'אין עליך!', 'רצף מטורף!'][combo % 4]!
-  }
-  return ['בול!', 'יפה!', 'קטן עליך!', 'מצוין!', 'חד!', 'אלוף!'][combo % 6]!
+const BANK: Record<PraiseKind, string[]> = {
+  speed_lightning: ['ברק! ⚡', 'טייס!', 'מטורף! 🚀', 'הבזק!', 'סופר-סאוני!'],
+  speed_fast: ['מהיר! 💨', 'זריז!', 'קצב גבוה!', 'ספיד!', 'חד כמו סכין!'],
+  combo_hot: ['בוער! 🔥', 'מכונה!', 'אין עליך!', 'רצף מטורף!', 'על הגל!'],
+  combo_mid: ['רצף חי!', 'נשמרים!', 'עוד אחד!', 'הקצב עולה!'],
+  recovery: ['קאמבק! 💪', 'חזרת חזק!', 'מכאן רק קדימה!', 'תיקון מושלם!'],
+  milestone: ['ציון דרך! ⭐', 'רמה למעלה!', 'התקדמות!', 'עולים מדרגה!'],
+  progress: ['צעד קדימה!', 'לומדים!', 'השתפרת!', 'עוד לבנה בחומה!'],
+  standard: ['בול!', 'יפה!', 'קטן עליך!', 'מצוין!', 'חד!', 'אלוף!', 'נכון!', 'כל הכבוד!'],
 }
 
-export const PRAISE_WORDS = ['בול!', 'יפה!', 'קטן עליך!', 'מצוין!', 'חד!'] as const
-export const HOT_PRAISE = ['בוער! 🔥', 'מכונה!', 'אין עליך!'] as const
+export function pickPraiseDetailed(input: {
+  combo: number
+  tier: SpeedTier
+  recovered: boolean
+  questionIndex: number
+  totalQuestions: number
+  recent?: string[]
+}): { text: string; kind: PraiseKind } {
+  const { combo, tier, recovered, questionIndex, totalQuestions, recent = [] } = input
+
+  let kind: PraiseKind = 'standard'
+  if (recovered) kind = 'recovery'
+  else if (tier === 'lightning') kind = 'speed_lightning'
+  else if (tier === 'fast') kind = 'speed_fast'
+  else if (combo >= 6) kind = 'combo_hot'
+  else if (combo >= 3) kind = 'combo_mid'
+  else if (questionIndex > 0 && (questionIndex + 1) % 3 === 0) kind = 'milestone'
+  else if (questionIndex >= Math.floor(totalQuestions * 0.5)) kind = 'progress'
+
+  const pool = BANK[kind]
+  // Avoid immediate repeats
+  const fresh = pool.filter((p) => !recent.includes(p))
+  const list = fresh.length ? fresh : pool
+  const text = list[(combo + questionIndex) % list.length]!
+  return { text, kind }
+}
+
+export function pickPraise(combo: number, tier: SpeedTier): string {
+  return pickPraiseDetailed({
+    combo,
+    tier,
+    recovered: false,
+    questionIndex: combo,
+    totalQuestions: 8,
+  }).text
+}
+
+export const PRAISE_WORDS = BANK.standard
+export const HOT_PRAISE = BANK.combo_hot
