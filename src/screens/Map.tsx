@@ -1,31 +1,41 @@
 import { bootAudio, isMuted, toggleMute } from '../audio/engine'
 import { stopMusic } from '../audio/music'
 import { playClick } from '../audio/sfx'
-import { PERCENT_STAGES, isStageUnlocked } from '../engine/stages'
+import {
+  getWorld,
+  isStageUnlocked,
+  isWorldUnlocked,
+  stageKey,
+  worldStars,
+} from '../engine/worlds'
 import { Num } from '../components/Num'
 import { t } from '../i18n/t'
 import { useGameStore } from '../store/gameStore'
 import { useState } from 'react'
 
 export function Map() {
-  const starsByStage = useGameStore((s) => s.starsByStage)
-  const recommendId = useGameStore((s) => s.recommendId)
+  const starsByKey = useGameStore((s) => s.starsByKey)
+  const currentWorldId = useGameStore((s) => s.currentWorldId)
+  const recommendStageId = useGameStore((s) => s.recommendStageId)
   const bestScore = useGameStore((s) => s.bestScore)
   const startStage = useGameStore((s) => s.startStage)
+  const openWorlds = useGameStore((s) => s.openWorlds)
   const goHome = useGameStore((s) => s.goHome)
   const [muted, setMuted] = useState(isMuted)
 
-  const totalStars = PERCENT_STAGES.reduce(
-    (sum, st) => sum + (starsByStage[st.id] ?? 0),
-    0,
-  )
-  const completed = PERCENT_STAGES.filter((st) => (starsByStage[st.id] ?? 0) >= 1).length
+  const world = getWorld(currentWorldId)
+  const stages = world?.stages ?? []
+  const unlockedWorld = isWorldUnlocked(currentWorldId, starsByKey)
+  const totalStars = worldStars(currentWorldId, starsByKey)
+  const completed = stages.filter(
+    (st) => (starsByKey[stageKey(currentWorldId, st.id)] ?? 0) >= 1,
+  ).length
 
   async function onPlay(stageId: number) {
-    if (!isStageUnlocked(stageId, starsByStage)) return
+    if (!unlockedWorld || !isStageUnlocked(currentWorldId, stageId, starsByKey)) return
     await bootAudio()
     playClick()
-    startStage(stageId)
+    startStage(currentWorldId, stageId)
   }
 
   function onMute() {
@@ -34,15 +44,28 @@ export function Map() {
     if (next) stopMusic()
   }
 
+  if (!world) {
+    return (
+      <div className="screen map-screen">
+        <p className="hint">{t('end.missing')}</p>
+        <button type="button" className="btn-secondary" onClick={openWorlds}>
+          {t('worlds.title')}
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="screen map-screen">
       <header className="map-header">
-        <button type="button" className="chip" onClick={goHome}>
-          ← {t('map.home')}
+        <button type="button" className="chip" onClick={openWorlds}>
+          ← {t('worlds.title')}
         </button>
         <div className="map-header-mid">
-          <h1 className="map-title">{t('map.title')}</h1>
-          <p className="map-sub">{t('map.world')}</p>
+          <h1 className="map-title">
+            {world.emoji} {t(world.titleKey)}
+          </h1>
+          <p className="map-sub">{t(world.blurbKey)}</p>
         </div>
         <button type="button" className="chip" onClick={onMute} aria-label="mute">
           {muted ? '🔇' : '🔊'}
@@ -51,10 +74,10 @@ export function Map() {
 
       <div className="map-stats">
         <span className="stat-pill">
-          ⭐ <Num>{totalStars}</Num>/24
+          ⭐ <Num>{totalStars}</Num>/{stages.length * 3}
         </span>
         <span className="stat-pill">
-          {t('map.completed', { n: completed })}
+          {t('map.completed', { n: completed }).replace('8', String(stages.length))}
         </span>
         {bestScore > 0 && (
           <span className="stat-pill chip-best">
@@ -63,11 +86,22 @@ export function Map() {
         )}
       </div>
 
+      {!unlockedWorld && (
+        <div className="wrong-panel" style={{ marginBottom: 12 }}>
+          <p className="wrong-title">{t('worlds.locked')}</p>
+          <p className="wrong-err">{t(`world.unlock.${currentWorldId}`)}</p>
+          <button type="button" className="btn-secondary" onClick={goHome}>
+            {t('map.home')}
+          </button>
+        </div>
+      )}
+
       <div className="map-list">
-        {PERCENT_STAGES.map((stage, i) => {
-          const unlocked = isStageUnlocked(stage.id, starsByStage)
-          const stars = starsByStage[stage.id] ?? 0
-          const isNext = stage.id === recommendId && unlocked
+        {stages.map((stage, i) => {
+          const unlocked =
+            unlockedWorld && isStageUnlocked(currentWorldId, stage.id, starsByKey)
+          const stars = starsByKey[stageKey(currentWorldId, stage.id)] ?? 0
+          const isNext = stage.id === recommendStageId && unlocked
           return (
             <button
               key={stage.id}
@@ -80,7 +114,7 @@ export function Map() {
                 <span className={`map-node ${unlocked ? 'on' : ''} ${stars > 0 ? 'done' : ''}`}>
                   {unlocked ? stage.emoji : '🔒'}
                 </span>
-                {i < PERCENT_STAGES.length - 1 && (
+                {i < stages.length - 1 && (
                   <span className={`map-line ${unlocked ? 'on' : ''}`} />
                 )}
               </div>

@@ -6,6 +6,20 @@ import { percentReversal } from './percentReversal'
 import { percentChange } from './percentChange'
 import { percentIs } from './percentIs'
 import { successivePercent } from './successivePercent'
+import {
+  ratioPart,
+  ratioScale,
+  ratioWhole,
+  ratioMix,
+  ratioTriple,
+} from './ratios'
+import {
+  meanSimple,
+  meanMissing,
+  meanWeighted,
+  meanNeeded,
+  meanRemove,
+} from './averages'
 
 export const ALL_GENERATORS: Generator[] = [
   percentOf,
@@ -13,6 +27,16 @@ export const ALL_GENERATORS: Generator[] = [
   percentChange,
   percentIs,
   successivePercent,
+  ratioPart,
+  ratioScale,
+  ratioWhole,
+  ratioMix,
+  ratioTriple,
+  meanSimple,
+  meanMissing,
+  meanWeighted,
+  meanNeeded,
+  meanRemove,
 ]
 
 export const LABELS = ['א', 'ב', 'ג', 'ד'] as const
@@ -23,7 +47,6 @@ export function materialize(
   difficulty = 1,
 ): GeneratedQuestion {
   const rng = new RNG(seed)
-  // Retry a few seeds if distractors collapse (rare)
   let raw = gen.generate(rng, difficulty)
   let attempt = 0
   while (raw.distractors.length < 3 && attempt < 8) {
@@ -34,7 +57,6 @@ export function materialize(
   const answer = cleanNum(raw.answer)
   const distractors = raw.distractors.map((d) => ({
     ...d,
-    // Same visual family as the correct answer (int vs decimals)
     value: matchAnswerStyle(d.value, answer),
   }))
 
@@ -107,7 +129,6 @@ const BY_ID: Record<string, Generator> = Object.fromEntries(
   ALL_GENERATORS.map((g) => [g.id, g]),
 )
 
-/** Build questions from a stage plan with ramping difficulty. */
 export function buildStageQuestionsFromPlan(
   generatorIds: string[],
   count: number,
@@ -116,7 +137,6 @@ export function buildStageQuestionsFromPlan(
   stageBaseDifficulty = 1,
 ): GeneratedQuestion[] {
   const pool = generatorIds.length ? generatorIds : ALL_GENERATORS.map((g) => g.id)
-  // Shuffle pool order per stage so patterns don't feel fixed
   const orderRng = new RNG(baseSeed ^ 0x9e3779b9)
   const shuffledPool = orderRng.shuffle(pool)
 
@@ -145,7 +165,6 @@ export function buildStageQuestionsFromPlan(
     if (timeScale !== 1) {
       q.timeTargetSec = Math.max(16, Math.round(q.timeTargetSec * timeScale))
     }
-    // Slightly tighter time on later items in stage
     if (i >= Math.floor(count * 0.6)) {
       q.timeTargetSec = Math.max(16, Math.round(q.timeTargetSec * 0.92))
     }
@@ -154,4 +173,20 @@ export function buildStageQuestionsFromPlan(
   return questions
 }
 
-export { percentOf, percentReversal, percentChange, percentIs, successivePercent }
+export {
+  percentOf,
+  percentReversal,
+  percentChange,
+  percentIs,
+  successivePercent,
+  ratioPart,
+  ratioScale,
+  ratioWhole,
+  ratioMix,
+  ratioTriple,
+  meanSimple,
+  meanMissing,
+  meanWeighted,
+  meanNeeded,
+  meanRemove,
+}

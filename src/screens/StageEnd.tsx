@@ -83,7 +83,8 @@ function SummaryBody({ result }: { result: StageSummary }) {
       <h1 className="display-title end-title">{t('end.title')}</h1>
 
       <p className="end-stage-name">
-        {t('map.stage_n', { n: result.stageId })} · {t(result.stageTitleKey)}
+        {t(result.worldTitleKey)} · {t('map.stage_n', { n: result.stageId })} ·{' '}
+        {t(result.stageTitleKey)}
       </p>
 
       {result.wasNewRecord && (
@@ -243,24 +244,28 @@ export function StageEnd() {
   const startStage = useGameStore((s) => s.startStage)
   const goHome = useGameStore((s) => s.goHome)
   const openMap = useGameStore((s) => s.openMap)
+  const openWorlds = useGameStore((s) => s.openWorlds)
   const currentStageId = useGameStore((s) => s.currentStageId)
+  const currentWorldId = useGameStore((s) => s.currentWorldId)
 
   async function onReplay() {
     await bootAudio()
-    startStage(stageSummary?.stageId ?? currentStageId ?? 1)
+    const wid = stageSummary?.worldId ?? currentWorldId
+    const sid = stageSummary?.stageId ?? currentStageId ?? 1
+    startStage(wid, sid)
   }
 
   async function onNext() {
     if (!stageSummary?.nextStageId) return
     await bootAudio()
-    startStage(stageSummary.nextStageId)
+    startStage(stageSummary.worldId, stageSummary.nextStageId)
   }
 
   if (!stageSummary) {
     return (
       <EmptyEnd
         onReplay={onReplay}
-        onMap={openMap}
+        onMap={() => openMap(currentWorldId)}
         onHome={goHome}
       />
     )
@@ -284,8 +289,15 @@ export function StageEnd() {
           {stageSummary.nextStageId == null && <span className="btn-shine" aria-hidden />}
           {t('end.replay')}
         </button>
-        <button type="button" className="btn-secondary" onClick={openMap}>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => openMap(stageSummary.worldId)}
+        >
           {t('end.map')}
+        </button>
+        <button type="button" className="btn-secondary" onClick={openWorlds}>
+          {t('end.worlds')}
         </button>
         <button type="button" className="btn-secondary" onClick={goHome}>
           {t('end.home')}

@@ -3,6 +3,7 @@ import { Home } from './screens/Home'
 import { Map } from './screens/Map'
 import { Play } from './screens/Play'
 import { StageEnd } from './screens/StageEnd'
+import { Worlds } from './screens/Worlds'
 import { useGameStore } from './store/gameStore'
 
 class ErrorBoundary extends Component<
@@ -74,6 +75,7 @@ function Router() {
   return (
     <div className="app-shell">
       {screen === 'home' && <Home />}
+      {screen === 'worlds' && <Worlds />}
       {screen === 'map' && <Map />}
       {screen === 'play' && <Play />}
       {screen === 'end' && <StageEnd />}

@@ -4,10 +4,15 @@ import { loadProgress, saveStageResult } from '../db/progress'
 import { buildStageQuestionsFromPlan } from '../engine/generators'
 import {
   getStageDef,
+  getWorld,
   isStageUnlocked,
-  recommendStageId,
+  isWorldUnlocked,
+  recommendInWorld,
+  recommendTarget,
+  stageKey,
   type StageDef,
-} from '../engine/stages'
+  type WorldId,
+} from '../engine/worlds'
 import {
   comboMultiplier,
   pickPraiseDetailed,
@@ -19,7 +24,7 @@ import {
 } from '../engine/scoring'
 import type { AnswerRecord, GeneratedQuestion } from '../engine/types'
 
-export type Screen = 'home' | 'map' | 'play' | 'end'
+export type Screen = 'home' | 'worlds' | 'map' | 'play' | 'end'
 
 export interface QuestionRecap {
   index: number
@@ -33,8 +38,10 @@ export interface QuestionRecap {
 }
 
 export interface StageSummary {
+  worldId: WorldId
   stageId: number
   stageTitleKey: string
+  worldTitleKey: string
   accuracy: number
   correctCount: number
   wrongCount: number
@@ -81,18 +88,21 @@ interface GameState {
   burst: { x: number; y: number; id: number } | null
   lightningCount: number
   stageSummary: StageSummary | null
-  /** stars 0–3 per stage id */
-  starsByStage: Record<number, number>
+  /** worldId:stageId → stars */
+  starsByKey: Record<string, number>
+  currentWorldId: WorldId
   currentStageId: number | null
   currentStage: StageDef | null
-  recommendId: number
+  recommendWorldId: WorldId
+  recommendStageId: number
   lastWasWrong: boolean
   recentPraises: string[]
 
   hydrate: () => Promise<void>
-  openMap: () => void
+  openWorlds: () => void
+  openMap: (worldId?: WorldId) => void
   goHome: () => void
-  startStage: (stageId?: number) => void
+  startStage: (worldId?: WorldId, stageId?: number) => void
   submitAnswer: (value: number, errorMode: string | undefined, clientX: number, clientY: number) => void
   advanceAfterWrong: () => void
   clearBurst: () => void
@@ -105,8 +115,10 @@ function buildSummary(input: {
   maxCombo: number
   bestScore: number
   prevBest: number
+  worldId: WorldId
   stageId: number
   stageTitleKey: string
+  worldTitleKey: string
   unlockedNext: boolean
   nextStageId: number | null
 }): StageSummary {
@@ -144,14 +156,11 @@ function buildSummary(input: {
     }
   })
 
-  const lightningCount = recap.filter((r) => r.speedTier === 'lightning').length
-  const fastCount = recap.filter(
-    (r) => r.speedTier === 'fast' || r.speedTier === 'lightning',
-  ).length
-
   return {
+    worldId: input.worldId,
     stageId: input.stageId,
     stageTitleKey: input.stageTitleKey,
+    worldTitleKey: input.worldTitleKey,
     accuracy,
     correctCount,
     wrongCount,
@@ -164,8 +173,8 @@ function buildSummary(input: {
     wasNewRecord: score > input.prevBest,
     unlockedNext: input.unlockedNext,
     nextStageId: input.nextStageId,
-    lightningCount,
-    fastCount,
+    lightningCount: recap.filter((r) => r.speedTier === 'lightning').length,
+    fastCount: recap.filter((r) => r.speedTier === 'fast' || r.speedTier === 'lightning').length,
     avgSec: avgMs / 1000,
     totalSec: totalMs / 1000,
     bestScore: input.bestScore,
@@ -189,57 +198,85 @@ export const useGameStore = create<GameState>((set, get) => ({
   burst: null,
   lightningCount: 0,
   stageSummary: null,
-  starsByStage: {},
+  starsByKey: {},
+  currentWorldId: 'percentages',
   currentStageId: null,
   currentStage: null,
-  recommendId: 1,
+  recommendWorldId: 'percentages',
+  recommendStageId: 1,
   lastWasWrong: false,
   recentPraises: [],
 
   hydrate: async () => {
     try {
-      const { bestScore, starsByStage } = await loadProgress()
+      const { bestScore, starsByKey } = await loadProgress()
+      const rec = recommendTarget(starsByKey)
       set({
         ready: true,
         bestScore,
-        starsByStage,
-        recommendId: recommendStageId(starsByStage),
+        starsByKey,
+        recommendWorldId: rec.worldId,
+        recommendStageId: rec.stageId,
       })
     } catch (e) {
       console.error('hydrate failed', e)
-      set({ ready: true, recommendId: 1 })
+      set({ ready: true })
     }
   },
 
-  openMap: () => {
+  openWorlds: () => {
     stopMusic()
-    const starsByStage = get().starsByStage
+    const rec = recommendTarget(get().starsByKey)
     set({
-      screen: 'map',
+      screen: 'worlds',
       locked: false,
       lastFeedback: null,
       burst: null,
-      recommendId: recommendStageId(starsByStage),
+      recommendWorldId: rec.worldId,
+      recommendStageId: rec.stageId,
+    })
+  },
+
+  openMap: (worldId) => {
+    stopMusic()
+    const starsByKey = get().starsByKey
+    const wid = worldId ?? get().currentWorldId
+    if (!isWorldUnlocked(wid, starsByKey) && getWorld(wid)?.status === 'live') {
+      // still allow opening locked live worlds to show lock UI — use unlock check in UI
+    }
+    set({
+      screen: 'map',
+      currentWorldId: wid,
+      locked: false,
+      lastFeedback: null,
+      burst: null,
+      recommendStageId: recommendInWorld(wid, starsByKey),
     })
   },
 
   goHome: () => {
     stopMusic()
+    const rec = recommendTarget(get().starsByKey)
     set({
       screen: 'home',
       locked: false,
       lastFeedback: null,
       burst: null,
-      recommendId: recommendStageId(get().starsByStage),
+      recommendWorldId: rec.worldId,
+      recommendStageId: rec.stageId,
     })
   },
 
-  startStage: (stageId?: number) => {
-    const starsByStage = get().starsByStage
-    const id = stageId ?? recommendStageId(starsByStage)
-    if (!isStageUnlocked(id, starsByStage)) return
+  startStage: (worldId, stageId) => {
+    const starsByKey = get().starsByKey
+    const rec = recommendTarget(starsByKey)
+    const wid = worldId ?? rec.worldId
+    const sid = stageId ?? recommendInWorld(wid, starsByKey)
 
-    const def = getStageDef(id)
+    if (!isWorldUnlocked(wid, starsByKey)) return
+    if (!isStageUnlocked(wid, sid, starsByKey)) return
+
+    const def = getStageDef(wid, sid)
     if (!def) return
 
     const seed = Date.now() % 1_000_000
@@ -269,7 +306,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       burst: null,
       lightningCount: 0,
       stageSummary: null,
-      currentStageId: id,
+      currentWorldId: wid,
+      currentStageId: sid,
       currentStage: def,
       lastWasWrong: false,
       recentPraises: [],
@@ -392,8 +430,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
 async function finishStage() {
   const s = useGameStore.getState()
+  const worldId = s.currentWorldId
   const stageId = s.currentStageId ?? 1
-  const def = s.currentStage ?? getStageDef(stageId)
+  const def = s.currentStage ?? getStageDef(worldId, stageId)
+  const world = getWorld(worldId)
   const prevBest = s.bestScore
   const correctCount = s.answers.filter((a) => a.correct).length
   const accuracy = s.answers.length ? correctCount / s.answers.length : 0
@@ -408,15 +448,17 @@ async function finishStage() {
       : 35
   const stars = starsForStage(accuracy, avgMs, avgTarget)
 
-  const prevStars = { ...s.starsByStage }
-  const newStarsForStage = Math.max(prevStars[stageId] ?? 0, stars)
-  const starsByStage = { ...prevStars, [stageId]: newStarsForStage }
+  const key = stageKey(worldId, stageId)
+  const prevStars = { ...s.starsByKey }
+  const newStarsForStage = Math.max(prevStars[key] ?? 0, stars)
+  const starsByKey = { ...prevStars, [key]: newStarsForStage }
   const best = Math.max(prevBest, score)
 
-  const nextId = stageId < 8 ? stageId + 1 : null
+  const maxStage = world?.stages.length ?? 8
+  const nextId = stageId < maxStage ? stageId + 1 : null
   const unlockedNext =
     nextId != null &&
-    (prevStars[stageId] ?? 0) < 1 &&
+    (prevStars[key] ?? 0) < 1 &&
     newStarsForStage >= 1
 
   const stageSummary = buildSummary({
@@ -426,22 +468,27 @@ async function finishStage() {
     maxCombo: s.maxCombo,
     bestScore: best,
     prevBest,
+    worldId,
     stageId,
-    stageTitleKey: def?.titleKey ?? 'stage.1.title',
-    unlockedNext: Boolean(unlockedNext || (nextId && isStageUnlocked(nextId, starsByStage))),
-    nextStageId: nextId && isStageUnlocked(nextId, starsByStage) ? nextId : null,
+    stageTitleKey: def?.titleKey ?? 'pct.stage.1.title',
+    worldTitleKey: world?.titleKey ?? 'world.percentages.title',
+    unlockedNext: Boolean(
+      unlockedNext || (nextId && isStageUnlocked(worldId, nextId, starsByKey)),
+    ),
+    nextStageId:
+      nextId && isStageUnlocked(worldId, nextId, starsByKey) ? nextId : null,
   })
-  // wasNewRecord for stage best / global
   stageSummary.wasNewRecord = score > prevBest
 
   try {
-    await saveStageResult({ stageId, stars, score, bestScore: best })
+    await saveStageResult({ worldId, stageId, stars, score, bestScore: best })
   } catch (e) {
     console.error('saveStageResult failed', e)
   }
 
   window.setTimeout(() => stopMusic(), 2200)
 
+  const rec = recommendTarget(starsByKey)
   useGameStore.setState({
     screen: 'end',
     locked: false,
@@ -449,7 +496,8 @@ async function finishStage() {
     bestScore: best,
     burst: null,
     stageSummary,
-    starsByStage,
-    recommendId: recommendStageId(starsByStage),
+    starsByKey,
+    recommendWorldId: rec.worldId,
+    recommendStageId: rec.stageId,
   })
 }

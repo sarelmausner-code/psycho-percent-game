@@ -21,6 +21,7 @@ export function Play() {
   const advanceAfterWrong = useGameStore((s) => s.advanceAfterWrong)
   const currentStage = useGameStore((s) => s.currentStage)
   const currentStageId = useGameStore((s) => s.currentStageId)
+  const currentWorldId = useGameStore((s) => s.currentWorldId)
   const [muted, setMuted] = useState(isMuted)
 
   const q = questions[index]
@@ -143,7 +144,7 @@ export function Play() {
         <div className="q-badge-row">
           <div className="q-badge">
             {currentStage
-              ? `${currentStage.emoji} ${t('map.stage_n', { n: currentStageId ?? 1 })} · ${index + 1}/${questions.length}`
+              ? `${currentStage.emoji} ${t(`world.${currentWorldId}.title`)} · ${t('map.stage_n', { n: currentStageId ?? 1 })} · ${index + 1}/${questions.length}`
               : `${t('play.q_of', { n: index + 1, total: questions.length })}`}
           </div>
           <div className={`diff-chip d${Math.min(5, q.difficulty || 1)}`}>

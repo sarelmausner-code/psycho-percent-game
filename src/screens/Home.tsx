@@ -2,34 +2,30 @@ import { useState } from 'react'
 import { bootAudio, isMuted, toggleMute } from '../audio/engine'
 import { stopMusic } from '../audio/music'
 import { playClick } from '../audio/sfx'
-import { getStageDef } from '../engine/stages'
+import { getStageDef, getWorld } from '../engine/worlds'
 import { Num } from '../components/Num'
 import { t } from '../i18n/t'
 import { useGameStore } from '../store/gameStore'
 
 export function Home() {
   const startStage = useGameStore((s) => s.startStage)
-  const openMap = useGameStore((s) => s.openMap)
+  const openWorlds = useGameStore((s) => s.openWorlds)
   const bestScore = useGameStore((s) => s.bestScore)
-  const recommendId = useGameStore((s) => s.recommendId)
-  const starsByStage = useGameStore((s) => s.starsByStage)
+  const recommendWorldId = useGameStore((s) => s.recommendWorldId)
+  const recommendStageId = useGameStore((s) => s.recommendStageId)
+  const starsByKey = useGameStore((s) => s.starsByKey)
   const ready = useGameStore((s) => s.ready)
   const [muted, setMutedUi] = useState(isMuted)
 
-  const rec = getStageDef(recommendId)
-  const recStars = starsByStage[recommendId] ?? 0
-  const totalStars = Object.values(starsByStage).reduce((a, b) => a + b, 0)
+  const world = getWorld(recommendWorldId)
+  const stage = getStageDef(recommendWorldId, recommendStageId)
+  const totalStars = Object.values(starsByKey).reduce((a, b) => a + b, 0)
   const hasProgress = totalStars > 0 || bestScore > 0
 
   async function onContinue() {
     await bootAudio()
     playClick()
-    startStage(recommendId)
-  }
-
-  async function onMap() {
-    playClick()
-    openMap()
+    startStage(recommendWorldId, recommendStageId)
   }
 
   function onMute() {
@@ -68,37 +64,30 @@ export function Home() {
       </div>
 
       <div className="feature-row">
+        <span className="feature-chip">{t('home.feature_worlds')}</span>
         <span className="feature-chip">{t('home.feature_speed')}</span>
-        <span className="feature-chip">{t('home.feature_music')}</span>
         <span className="feature-chip">{t('home.feature_combo')}</span>
       </div>
 
       <div className="home-card home-card-fun">
-        <div className="stage-pill pulse-pill">{t('home.world')}</div>
-        {ready && rec ? (
+        <div className="stage-pill pulse-pill">{t('home.worlds_line')}</div>
+        {ready && world && stage ? (
           <>
             <p className="continue-label">
               {hasProgress ? t('home.continue_label') : t('home.start_label')}
             </p>
             <p className="continue-stage">
-              {rec.emoji}{' '}
-              {t('map.stage_n', { n: recommendId })} · {t(rec.titleKey)}
+              {world.emoji} {t(world.titleKey)}
             </p>
-            {recStars > 0 && (
-              <p className="continue-stars">
-                {[1, 2, 3].map((k) => (
-                  <span key={k} style={{ opacity: recStars >= k ? 1 : 0.25 }}>
-                    ⭐
-                  </span>
-                ))}
-              </p>
-            )}
+            <p className="hint" style={{ marginBottom: 8 }}>
+              {stage.emoji} {t('map.stage_n', { n: recommendStageId })} · {t(stage.titleKey)}
+            </p>
             <p className="hint">
-              <Num>{rec.questionCount}</Num> {t('map.questions')}
+              <Num>{stage.questionCount}</Num> {t('map.questions')}
               {totalStars > 0 && (
                 <>
                   {' · '}
-                  ⭐ <Num>{totalStars}</Num>/24
+                  ⭐ <Num>{totalStars}</Num>
                 </>
               )}
             </p>
@@ -117,8 +106,15 @@ export function Home() {
           {hasProgress ? t('home.continue') : t('home.play')}
         </button>
 
-        <button type="button" className="btn-secondary" onClick={onMap}>
-          {t('home.open_map')}
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => {
+            playClick()
+            openWorlds()
+          }}
+        >
+          {t('home.open_worlds')}
         </button>
       </div>
 
