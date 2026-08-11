@@ -1,42 +1,47 @@
-import { getCtx, hz, isMuted } from './engine'
+import { getCtx, getMusicBus, hz, isMuted } from './engine'
 
 /**
- * Adaptive 8-bar loop built with Web Audio (no audio files).
- * Layer 1 always · Layer 2 at combo≥3 · Layer 3 at combo≥6 (+4% tempo).
- * Layer changes apply on the next bar boundary.
+ * Adaptive loop: kick + bass + chords + arp + hats.
+ * Intensity 0/1/2 from combo, applied on bar boundaries.
  */
 
-const BEAT = 0.42 // seconds per beat at base tempo
+const BEAT = 0.4
 const BEATS_PER_BAR = 4
 
-type LayerGains = {
+// Chord roots (semitones from C) for an 8-bar pop-ish loop in C major-ish bright
+const CHORD_ROOTS = [0, 0, 5, 5, 7, 7, 0, -5] // C C F F G G C G
+
+type Layers = {
+  kick: GainNode
   bass: GainNode
-  pulse: GainNode
+  chord: GainNode
   arp: GainNode
   hat: GainNode
   master: GainNode
 }
 
 let running = false
-let layers: LayerGains | null = null
+let layers: Layers | null = null
 let schedulerId: number | null = null
 let nextNoteTime = 0
 let beatIndex = 0
-let desiredIntensity = 0 // 0 | 1 | 2  (maps to combo bands)
+let desiredIntensity = 0
 let activeIntensity = 0
 let tempoScale = 1
+let urgency = 0 // 0–1 stage progress for slight speed-up
 
 function beatDur() {
-  return BEAT / tempoScale
+  return (BEAT / tempoScale) * (1 - urgency * 0.06)
 }
 
 export function startMusic() {
   const ctx = getCtx()
-  if (!ctx || running || isMuted()) return
+  const bus = getMusicBus()
+  if (!ctx || !bus || running || isMuted()) return
 
   const master = ctx.createGain()
-  master.gain.value = 0.22
-  master.connect(ctx.destination)
+  master.gain.value = 0.2
+  master.connect(bus)
 
   const mk = (v: number) => {
     const g = ctx.createGain()
@@ -46,10 +51,11 @@ export function startMusic() {
   }
 
   layers = {
-    bass: mk(0.9),
-    pulse: mk(0.55),
+    kick: mk(0.9),
+    bass: mk(0.75),
+    chord: mk(0.35),
     arp: mk(0),
-    hat: mk(0),
+    hat: mk(0.15),
     master,
   }
 
@@ -58,6 +64,7 @@ export function startMusic() {
   activeIntensity = 0
   desiredIntensity = 0
   tempoScale = 1
+  urgency = 0
   nextNoteTime = ctx.currentTime + 0.05
   schedule()
 }
@@ -78,18 +85,19 @@ export function stopMusic() {
   }
 }
 
-/** Map combo → intensity. Applied at bar boundary. */
 export function setMusicCombo(combo: number) {
   if (combo >= 6) desiredIntensity = 2
   else if (combo >= 3) desiredIntensity = 1
   else desiredIntensity = 0
 }
 
+/** 0–1 how far through the stage (tightens groove slightly). */
+export function setMusicUrgency(u: number) {
+  urgency = Math.max(0, Math.min(1, u))
+}
+
 export function setMusicMuted(muted: boolean) {
   if (muted) stopMusic()
-  else if (getCtx() && !running) {
-    // only restart if something external calls startMusic again
-  }
 }
 
 function schedule() {
@@ -98,13 +106,12 @@ function schedule() {
 
   const horizon = ctx.currentTime + 0.12
   while (nextNoteTime < horizon) {
-    // Bar boundary: apply intensity + tempo
     if (beatIndex % BEATS_PER_BAR === 0) {
       if (desiredIntensity !== activeIntensity) {
         activeIntensity = desiredIntensity
         applyIntensity(ctx, activeIntensity)
       }
-      tempoScale = activeIntensity >= 2 ? 1.04 : 1
+      tempoScale = activeIntensity >= 2 ? 1.05 : activeIntensity >= 1 ? 1.02 : 1
     }
 
     scheduleBeat(ctx, beatIndex, nextNoteTime)
@@ -118,46 +125,131 @@ function schedule() {
 function applyIntensity(ctx: AudioContext, level: number) {
   if (!layers) return
   const t = ctx.currentTime
-  const fade = 0.08
-  // arp on ≥1, hat on ≥2
+  const fade = 0.1
   layers.arp.gain.cancelScheduledValues(t)
   layers.hat.gain.cancelScheduledValues(t)
-  layers.arp.gain.setTargetAtTime(level >= 1 ? 0.55 : 0, t, fade)
-  layers.hat.gain.setTargetAtTime(level >= 2 ? 0.4 : 0, t, fade)
-  // slight master pump when hot
-  layers.master.gain.setTargetAtTime(level >= 2 ? 0.28 : 0.22, t, fade)
+  layers.chord.gain.cancelScheduledValues(t)
+  layers.master.gain.cancelScheduledValues(t)
+
+  layers.arp.gain.setTargetAtTime(level >= 1 ? 0.45 : 0, t, fade)
+  layers.hat.gain.setTargetAtTime(level >= 1 ? 0.28 : 0.12, t, fade)
+  layers.hat.gain.setTargetAtTime(level >= 2 ? 0.42 : level >= 1 ? 0.28 : 0.12, t, fade)
+  layers.chord.gain.setTargetAtTime(level >= 1 ? 0.42 : 0.32, t, fade)
+  layers.master.gain.setTargetAtTime(level >= 2 ? 0.26 : 0.2, t, fade)
 }
 
 function scheduleBeat(ctx: AudioContext, beat: number, time: number) {
   if (!layers || isMuted()) return
   const barBeat = beat % BEATS_PER_BAR
   const bar = Math.floor(beat / BEATS_PER_BAR) % 8
+  const root = CHORD_ROOTS[bar]!
+  const bd = beatDur()
 
-  // Layer 1 — bass root pattern (C minor-ish fun)
-  const bassNotes = [0, 0, -5, -7, 0, 3, -5, -12] // semitones from C3-ish
+  // Kick: 1 and 3 (four-on-floor-ish light)
   if (barBeat === 0 || barBeat === 2) {
-    const semi = bassNotes[bar]! + (barBeat === 2 ? 7 : 0)
-    pluck(ctx, layers.bass, hz(semi - 24), time, 0.28, 'triangle', 0.35)
+    kick(ctx, layers.kick, time, barBeat === 0 ? 0.14 : 0.1)
+  }
+  // Extra kick on intensity 2
+  if (activeIntensity >= 2 && barBeat === 1) {
+    kick(ctx, layers.kick, time + bd * 0.5, 0.06)
   }
 
-  // soft pulse on every beat
-  pluck(ctx, layers.pulse, hz(-12), time, 0.06, 'sine', barBeat === 0 ? 0.12 : 0.06)
+  // Soft snare-ish on 2 and 4
+  if (barBeat === 1 || barBeat === 3) {
+    snare(ctx, layers.kick, time, 0.07)
+  }
 
-  // Layer 2 — arpeggio C-Eb-G-Bb
+  // Bass: root + fifth pattern
+  if (barBeat === 0) {
+    pluck(ctx, layers.bass, hz(root - 24), time, 0.32, 'triangle', 0.32)
+  } else if (barBeat === 2) {
+    pluck(ctx, layers.bass, hz(root - 24 + 7), time, 0.22, 'triangle', 0.22)
+  } else if (activeIntensity >= 1 && (barBeat === 1 || barBeat === 3)) {
+    pluck(ctx, layers.bass, hz(root - 24), time + bd * 0.5, 0.1, 'sine', 0.12)
+  }
+
+  // Soft chord pad on beat 1 of bar
+  if (barBeat === 0) {
+    chord(ctx, layers.chord, root, time, 0.85)
+  }
+
+  // Arp layer
   if (activeIntensity >= 1) {
-    const arp = [0, 3, 7, 10, 12, 10, 7, 3]
-    const note = arp[(beat + bar) % arp.length]!
-    pluck(ctx, layers.arp, hz(note), time + 0.02, 0.12, 'sine', 0.14)
+    const triad = [0, 4, 7, 12, 7, 4, 0, 7]
+    const note = root + triad[(beat + bar) % triad.length]!
+    pluck(ctx, layers.arp, hz(note), time + 0.01, 0.11, 'sine', 0.12)
     if (barBeat === 1 || barBeat === 3) {
-      pluck(ctx, layers.arp, hz(note + 12), time + beatDur() * 0.5, 0.08, 'triangle', 0.08)
+      pluck(ctx, layers.arp, hz(note + 12), time + bd * 0.5, 0.08, 'triangle', 0.07)
     }
   }
 
-  // Layer 3 — hi-hat ticks (noise-ish via high square)
-  if (activeIntensity >= 2) {
-    hat(ctx, layers.hat, time, 0.03, 0.07)
-    hat(ctx, layers.hat, time + beatDur() * 0.5, 0.025, 0.05)
+  // Hats every beat; double-time when hot
+  noiseHat(ctx, layers.hat, time, 0.03, barBeat === 0 ? 0.06 : 0.04)
+  if (activeIntensity >= 1) {
+    noiseHat(ctx, layers.hat, time + bd * 0.5, 0.025, 0.035)
   }
+  if (activeIntensity >= 2) {
+    noiseHat(ctx, layers.hat, time + bd * 0.25, 0.02, 0.03)
+    noiseHat(ctx, layers.hat, time + bd * 0.75, 0.02, 0.028)
+  }
+}
+
+function kick(ctx: AudioContext, dest: GainNode, time: number, vol: number) {
+  const o = ctx.createOscillator()
+  const g = ctx.createGain()
+  o.type = 'sine'
+  o.frequency.setValueAtTime(150, time)
+  o.frequency.exponentialRampToValueAtTime(45, time + 0.08)
+  g.gain.setValueAtTime(0.0001, time)
+  g.gain.exponentialRampToValueAtTime(vol, time + 0.005)
+  g.gain.exponentialRampToValueAtTime(0.0001, time + 0.18)
+  o.connect(g)
+  g.connect(dest)
+  o.start(time)
+  o.stop(time + 0.2)
+}
+
+function snare(ctx: AudioContext, dest: GainNode, time: number, vol: number) {
+  // Tone body
+  const o = ctx.createOscillator()
+  const g = ctx.createGain()
+  o.type = 'triangle'
+  o.frequency.setValueAtTime(200, time)
+  o.frequency.exponentialRampToValueAtTime(120, time + 0.08)
+  g.gain.setValueAtTime(0.0001, time)
+  g.gain.exponentialRampToValueAtTime(vol * 0.5, time + 0.005)
+  g.gain.exponentialRampToValueAtTime(0.0001, time + 0.1)
+  o.connect(g)
+  g.connect(dest)
+  o.start(time)
+  o.stop(time + 0.12)
+  // Noise crack
+  noiseHat(ctx, dest, time, 0.06, vol * 0.7)
+}
+
+function noiseHat(ctx: AudioContext, dest: GainNode, time: number, dur: number, vol: number) {
+  // Filtered noise via many short high partials (no AudioBuffer needed)
+  for (let i = 0; i < 3; i++) {
+    const o = ctx.createOscillator()
+    const g = ctx.createGain()
+    o.type = 'square'
+    o.frequency.setValueAtTime(6000 + Math.random() * 6000 + i * 800, time)
+    g.gain.setValueAtTime(0.0001, time)
+    g.gain.exponentialRampToValueAtTime(vol * (0.5 + Math.random() * 0.5), time + 0.004)
+    g.gain.exponentialRampToValueAtTime(0.0001, time + dur)
+    o.connect(g)
+    g.connect(dest)
+    o.start(time)
+    o.stop(time + dur + 0.02)
+  }
+}
+
+function chord(ctx: AudioContext, dest: GainNode, root: number, time: number, dur: number) {
+  const intervals = [0, 4, 7] // major triad
+  intervals.forEach((iv, i) => {
+    pluck(ctx, dest, hz(root + iv - 12), time + i * 0.01, dur, 'sine', 0.07)
+    pluck(ctx, dest, hz(root + iv), time + i * 0.012, dur * 0.7, 'triangle', 0.04)
+  })
 }
 
 function pluck(
@@ -169,31 +261,18 @@ function pluck(
   type: OscillatorType,
   vol: number,
 ) {
+  if (freq < 20 || !Number.isFinite(freq)) return
   const o = ctx.createOscillator()
   const g = ctx.createGain()
   o.type = type
   o.frequency.setValueAtTime(freq, time)
   g.gain.setValueAtTime(0.0001, time)
-  g.gain.exponentialRampToValueAtTime(Math.max(vol, 0.0001), time + 0.015)
+  g.gain.exponentialRampToValueAtTime(Math.max(vol, 0.0001), time + 0.012)
   g.gain.exponentialRampToValueAtTime(0.0001, time + dur)
   o.connect(g)
   g.connect(dest)
   o.start(time)
-  o.stop(time + dur + 0.02)
-}
-
-function hat(ctx: AudioContext, dest: GainNode, time: number, dur: number, vol: number) {
-  const o = ctx.createOscillator()
-  const g = ctx.createGain()
-  o.type = 'square'
-  o.frequency.setValueAtTime(8000 + Math.random() * 2000, time)
-  g.gain.setValueAtTime(0.0001, time)
-  g.gain.exponentialRampToValueAtTime(vol, time + 0.005)
-  g.gain.exponentialRampToValueAtTime(0.0001, time + dur)
-  o.connect(g)
-  g.connect(dest)
-  o.start(time)
-  o.stop(time + dur + 0.01)
+  o.stop(time + dur + 0.03)
 }
 
 export function isMusicRunning() {

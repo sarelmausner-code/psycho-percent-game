@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { setMusicCombo, startMusic, stopMusic } from '../audio/music'
+import { setMusicCombo, setMusicUrgency, startMusic, stopMusic } from '../audio/music'
+import { playComboUp } from '../audio/sfx'
 import { loadProgress, saveStageResult } from '../db/progress'
 import { buildStageQuestionsFromPlan } from '../engine/generators'
 import {
@@ -295,6 +296,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     stopMusic()
     startMusic()
     setMusicCombo(0)
+    setMusicUrgency(0)
 
     set({
       screen: 'play',
@@ -368,6 +370,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     setMusicCombo(nextCombo)
+    // Combo milestone stingers
+    if (correct && (nextCombo === 3 || nextCombo === 6 || nextCombo === 9)) {
+      const lvl = nextCombo === 3 ? 2 : nextCombo === 6 ? 3 : 4
+      playComboUp(lvl)
+    }
 
     set({
       locked: true,
@@ -400,8 +407,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         if (cur.index + 1 >= cur.questions.length) {
           void finishStage()
         } else {
+          const nextIdx = cur.index + 1
+          setMusicUrgency(nextIdx / Math.max(1, cur.questions.length - 1))
           set({
-            index: cur.index + 1,
+            index: nextIdx,
             locked: false,
             lastFeedback: null,
             questionStartedAt: performance.now(),
