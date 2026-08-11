@@ -118,6 +118,17 @@
   "play.diff": "קושי {n}",
   "play.ramp": "הקושי עולה…",
 
+  "menu.open": "תפריט",
+  "menu.title": "בקרת משחק",
+  "menu.restart": "התחל מחדש",
+  "menu.exit": "יציאה",
+  "menu.back": "חזרה למשחק",
+  "menu.confirm_exit": "האם אתה בטוח שברצונך לצאת?",
+  "menu.confirm_restart": "האם אתה בטוח שברצונך להתחיל מחדש?",
+  "menu.confirm_hint": "ההתקדמות בשלב הנוכחי תאבד.",
+  "menu.yes": "כן",
+  "menu.no": "לא",
+
   "end.title": "כל הכבוד! 🎉",
   "end.fail_title": "כמעט… נסו שוב",
   "end.fail_banner": "דיוק {pct}% — צריך לפחות {need}% כדי לפתוח את השלב הבא",

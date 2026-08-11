@@ -681,6 +681,130 @@ button {
   place-items: center;
 }
 
+.menu-fab {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 5;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  font-size: 1.2rem;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  max-width: 430px;
+  margin: 0 auto;
+}
+
+.menu-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 32, 58, 0.45);
+  border: none;
+  cursor: pointer;
+}
+
+.menu-sheet {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 320px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(20, 32, 58, 0.2);
+  padding: 20px 18px 16px;
+  text-align: center;
+  animation: optIn 0.25s var(--ease-back);
+}
+
+.menu-title {
+  margin: 0 0 14px;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.35;
+}
+
+.menu-hint {
+  margin: -6px 0 14px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.menu-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  border: 2px solid transparent;
+  transition: transform var(--dur-fast) var(--ease-back);
+}
+
+.menu-btn:active {
+  transform: scale(0.98);
+}
+
+.menu-btn-restart {
+  background: linear-gradient(180deg, #4d6dff, var(--pen));
+  color: #fff;
+  box-shadow: 0 4px 0 #2a42c9;
+}
+
+.menu-btn-exit {
+  background: var(--no-bg);
+  color: var(--no);
+  border-color: #f5c2c5;
+}
+
+.menu-btn-cancel {
+  background: #f4f7fc;
+  color: var(--ink-2);
+  border-color: var(--line);
+  margin-bottom: 0;
+}
+
+.menu-yesno {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.menu-yesno .menu-btn {
+  margin-bottom: 0;
+}
+
+.menu-btn-yes {
+  background: linear-gradient(180deg, #4d6dff, var(--pen));
+  color: #fff;
+  box-shadow: 0 4px 0 #2a42c9;
+}
+
+.menu-btn-no {
+  background: #f4f7fc;
+  color: var(--ink);
+  border-color: var(--line);
+}
+
 /* —— Timer —— */
 .timer-ring {
   position: relative;

@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react'
-import { isMuted, toggleMute } from '../audio/engine'
+import { bootAudio, isMuted, toggleMute } from '../audio/engine'
 import { startMusic, stopMusic } from '../audio/music'
 import { playCorrect, playHurry, playWrong } from '../audio/sfx'
+import { GameMenu } from '../components/GameMenu'
 import { Narrative, Num } from '../components/Num'
 import { ParticleBurst } from '../components/ParticleBurst'
 import { TimerRing } from '../components/TimerRing'
@@ -22,7 +23,10 @@ export function Play() {
   const currentStage = useGameStore((s) => s.currentStage)
   const currentStageId = useGameStore((s) => s.currentStageId)
   const currentWorldId = useGameStore((s) => s.currentWorldId)
+  const goHome = useGameStore((s) => s.goHome)
+  const startStage = useGameStore((s) => s.startStage)
   const [muted, setMuted] = useState(isMuted)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const q = questions[index]
   const hot = combo >= 6
@@ -43,8 +47,18 @@ export function Play() {
     if (next) stopMusic()
     else {
       startMusic()
-      // intensity will re-apply from combo on next bar
     }
+  }
+
+  async function onRestart() {
+    setMenuOpen(false)
+    await bootAudio()
+    startStage(currentWorldId, currentStageId ?? 1)
+  }
+
+  function onExit() {
+    setMenuOpen(false)
+    goHome()
   }
 
   if (!q) return null
@@ -54,7 +68,7 @@ export function Play() {
     errorMode: string | undefined,
     e: React.MouseEvent | React.TouchEvent,
   ) {
-    if (locked) return
+    if (locked || menuOpen) return
     const point =
       'clientX' in e
         ? { x: e.clientX, y: e.clientY }
@@ -89,6 +103,14 @@ export function Play() {
         {muted ? '🔇' : '🔊'}
       </button>
 
+      <GameMenu
+        onExit={onExit}
+        onRestart={() => {
+          void onRestart()
+        }}
+        onOpenChange={setMenuOpen}
+      />
+
       <header className="play-hud">
         <div className="hud-score">
           <span className={`score-pop ${lastFeedback?.correct ? 'score-pop-go' : ''}`}>
@@ -101,7 +123,7 @@ export function Play() {
           key={questionStartedAt}
           totalSec={q.timeTargetSec}
           startedAt={questionStartedAt}
-          paused={locked}
+          paused={locked || menuOpen}
           onHurry={onHurry}
         />
 

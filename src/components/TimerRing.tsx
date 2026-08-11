@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export function TimerRing({
   totalSec,
@@ -13,17 +13,30 @@ export function TimerRing({
 }) {
   const [left, setLeft] = useState(totalSec)
   const [hurryFired, setHurryFired] = useState(false)
+  const pausedAccum = useRef(0)
+  const pauseStarted = useRef<number | null>(null)
 
   useEffect(() => {
     setLeft(totalSec)
     setHurryFired(false)
+    pausedAccum.current = 0
+    pauseStarted.current = null
   }, [startedAt, totalSec])
 
   useEffect(() => {
-    if (paused) return
+    if (paused) {
+      if (pauseStarted.current == null) pauseStarted.current = performance.now()
+      return
+    }
+    // resume: add paused duration
+    if (pauseStarted.current != null) {
+      pausedAccum.current += performance.now() - pauseStarted.current
+      pauseStarted.current = null
+    }
+
     let raf = 0
     const tick = () => {
-      const elapsed = (performance.now() - startedAt) / 1000
+      const elapsed = (performance.now() - startedAt - pausedAccum.current) / 1000
       const remain = Math.max(0, totalSec - elapsed)
       setLeft(remain)
       if (remain <= totalSec * 0.25 && remain > 0 && !hurryFired) {
