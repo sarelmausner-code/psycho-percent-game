@@ -1,5 +1,11 @@
 import { create } from 'zustand'
-import { setMusicCombo, setMusicUrgency, startMusic, stopMusic } from '../audio/music'
+import {
+  setMusicCombo,
+  setMusicUrgency,
+  startMusic,
+  stopMusic,
+  stopMusicSoon,
+} from '../audio/music'
 import { playComboUp } from '../audio/sfx'
 import { loadProgress, saveStageResult } from '../db/progress'
 import { buildStageQuestionsFromPlan } from '../engine/generators'
@@ -297,7 +303,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       def.baseDifficulty,
     )
 
-    stopMusic()
+    // startMusic always stops any previous loop first (no double tracks)
     startMusic()
     setMusicCombo(0)
     setMusicUrgency(0)
@@ -534,7 +540,8 @@ async function finishStage(opts?: {
     console.error('saveStageResult failed', e)
   }
 
-  window.setTimeout(() => stopMusic(), 2200)
+  // Delayed stop — cancelled automatically if player restarts (startMusic → stopMusic)
+  stopMusicSoon(2200)
 
   const rec = recommendTarget(starsByKey)
   useGameStore.setState({
