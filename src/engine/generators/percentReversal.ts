@@ -2,12 +2,17 @@ import type { Generator } from '../types'
 import type { RNG } from '../rng'
 import {
   cleanNum,
+  isOverlyRoundAnswer,
   pickByDifficulty,
   type Difficulty,
   uniquePlausible,
 } from '../difficulty'
 
-/** After disc% off, price is paid. What was original? */
+/**
+ * After disc% off → paid. Original price?
+ * Original (answer) is integer; distractors snapped to integers too.
+ * Avoid answer always being 200/300/400/500.
+ */
 export const percentReversal: Generator = {
   id: 'percent_reversal_v1',
   topic: 'percentages',
@@ -16,44 +21,75 @@ export const percentReversal: Generator = {
   generate(rng: RNG, difficulty = 1) {
     const d = Math.max(1, Math.min(5, difficulty)) as Difficulty
 
-    const disc = pickByDifficulty(
-      rng,
-      [10, 15, 20, 25],
-      [12, 15, 20, 25, 30, 40],
-      [8, 12, 18, 24, 28, 35, 45],
-      d,
+    // [disc, orig] with integer paid = orig * (1 - disc/100)
+    const easyPairs: [number, number][] = [
+      [20, 250],
+      [20, 150],
+      [25, 160],
+      [25, 240],
+      [10, 180],
+      [10, 240],
+      [15, 200],
+      [20, 175],
+    ]
+    const midPairs: [number, number][] = [
+      [20, 280],
+      [25, 280],
+      [15, 240],
+      [30, 200],
+      [20, 360],
+      [25, 320],
+      [10, 360],
+      [40, 250],
+      [15, 280],
+      [12, 250], // paid may be decimal — filter below
+    ]
+    const hardPairs: [number, number][] = [
+      [20, 320],
+      [25, 360],
+      [30, 280],
+      [15, 360],
+      [40, 280],
+      [20, 440],
+      [25, 440],
+      [10, 480],
+      [35, 200],
+      [15, 320],
+      [30, 360],
+    ]
+
+    let disc: number
+    let orig: number
+    let paid: number
+    let tries = 0
+    do {
+      ;[disc, orig] = pickByDifficulty(rng, easyPairs, midPairs, hardPairs, d)
+      paid = cleanNum(orig * (1 - disc / 100))
+      tries++
+    } while (
+      tries < 14 &&
+      (!Number.isInteger(paid) ||
+        !Number.isInteger(orig) ||
+        (d >= 2 && isOverlyRoundAnswer(orig)))
     )
 
-    // Choose original so paid is not always a "pretty" round number at higher d
-    const orig = pickByDifficulty(
-      rng,
-      [200, 250, 300, 400, 500],
-      [240, 280, 360, 450, 600],
-      [220, 280, 320, 375, 440, 560, 720],
-      d,
-    )
-
-    const paid = cleanNum(orig * (1 - disc / 100))
     const answer = orig
 
-    // Classic trap: add % onto discounted price — very close to truth
-    const wrongBase = cleanNum(paid * (1 + disc / 100))
-    const signFlip = cleanNum(paid / (1 + disc / 100))
-    const addDiscountAbs = cleanNum(paid + (orig * disc) / 100)
-    const addPoints = cleanNum(paid + disc * 2)
-    const overDisc = cleanNum(paid / (1 - (disc + 5) / 100))
-    const underDisc = cleanNum(paid / (1 - Math.max(5, disc - 5) / 100))
-    const guess = cleanNum(paid * 1.2)
-
+    // Traps that land on integers near orig
+    const wrongBase = paid * (1 + disc / 100) // classic
     const candidates = [
       { value: wrongBase, errorMode: 'applied_to_wrong_base' },
-      { value: signFlip, errorMode: 'sign_flip' },
-      { value: addDiscountAbs, errorMode: 'shekels_not_percent' },
-      { value: addPoints, errorMode: 'shekels_not_percent' },
-      { value: overDisc, errorMode: 'forgot_final_step' },
-      { value: underDisc, errorMode: 'forgot_final_step' },
-      { value: guess, errorMode: 'guessed_round_up' },
-      { value: cleanNum(paid / (disc / 100) / 10), errorMode: 'inverted_ratio' },
+      { value: paid / (1 + disc / 100), errorMode: 'sign_flip' },
+      { value: paid + (orig * disc) / 100, errorMode: 'shekels_not_percent' },
+      { value: paid + disc * 5, errorMode: 'shekels_not_percent' },
+      { value: paid / (1 - (disc + 5) / 100), errorMode: 'forgot_final_step' },
+      { value: paid / (1 - Math.max(5, disc - 5) / 100), errorMode: 'forgot_final_step' },
+      { value: orig + 20, errorMode: 'guessed_round_up' },
+      { value: orig - 20, errorMode: 'guessed_round_up' },
+      { value: orig + 40, errorMode: 'guessed_round_up' },
+      { value: orig - 40, errorMode: 'guessed_round_up' },
+      { value: paid * 1.25, errorMode: 'guessed_round_up' },
+      { value: paid * 1.1, errorMode: 'applied_to_wrong_base' },
     ]
 
     const narratives =

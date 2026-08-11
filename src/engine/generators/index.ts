@@ -1,5 +1,5 @@
 import { RNG } from '../rng'
-import { cleanNum, questionDifficulty } from '../difficulty'
+import { cleanNum, matchAnswerStyle, questionDifficulty } from '../difficulty'
 import type { GeneratedQuestion, Generator, Option } from '../types'
 import { percentOf } from './percentOf'
 import { percentReversal } from './percentReversal'
@@ -31,12 +31,14 @@ export function materialize(
     raw = gen.generate(new RNG(seed + attempt * 7919), difficulty)
   }
 
+  const answer = cleanNum(raw.answer)
   const distractors = raw.distractors.map((d) => ({
     ...d,
-    value: cleanNum(d.value),
+    // Same visual family as the correct answer (int vs decimals)
+    value: matchAnswerStyle(d.value, answer),
   }))
 
-  const seen = new Set<number>([cleanNum(raw.answer)])
+  const seen = new Set<number>([answer])
   const uniqueDistractors = distractors.filter((d) => {
     if (seen.has(d.value)) return false
     seen.add(d.value)
@@ -45,13 +47,16 @@ export function materialize(
 
   while (uniqueDistractors.length < 3) {
     const n = uniqueDistractors.length + 1
-    const fallback = cleanNum(raw.answer * (0.8 + n * 0.12))
-    if (!seen.has(fallback) && fallback !== raw.answer) {
+    const fallback = matchAnswerStyle(
+      answer + (Number.isInteger(answer) ? 10 * n : answer * 0.1 * n),
+      answer,
+    )
+    if (!seen.has(fallback) && fallback !== answer) {
       uniqueDistractors.push({ value: fallback, errorMode: 'guessed_round_up' })
       seen.add(fallback)
     } else {
       uniqueDistractors.push({
-        value: cleanNum(raw.answer + 5 * n),
+        value: matchAnswerStyle(answer - 5 * n, answer),
         errorMode: 'guessed_round_up',
       })
       break
@@ -59,9 +64,9 @@ export function materialize(
   }
 
   const optionsRaw = [
-    { value: cleanNum(raw.answer), correct: true as const },
+    { value: answer, correct: true as const },
     ...uniqueDistractors.slice(0, 3).map((d) => ({
-      value: cleanNum(d.value),
+      value: d.value,
       correct: false as const,
       errorMode: d.errorMode,
     })),
@@ -79,7 +84,7 @@ export function materialize(
     subtopic: gen.subtopic,
     narrativeKey: raw.narrativeKey,
     params: raw.params,
-    answer: cleanNum(raw.answer),
+    answer,
     options,
     solutionKey: raw.solutionKey,
     timeTargetSec: raw.timeTargetSec,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { RNG } from '../../rng'
 import { heDict } from '../../../i18n/t'
+import { roundness } from '../../difficulty'
 import { verifyIndependently } from '../../verify'
 import { ALL_GENERATORS, materialize } from '../index'
 
@@ -23,15 +24,32 @@ describe('generators harness', () => {
             expect(Number(v.toFixed(2))).toBe(v)
           })
 
+          // Same visual family: if answer is integer, ALL options are integers
+          if (Number.isInteger(q.answer)) {
+            q.options.forEach((o) => {
+              expect(Number.isInteger(o.value)).toBe(true)
+            })
+          }
+
           q.options
             .filter((o) => !o.correct)
             .forEach((o) => {
               if (q.answer === 0) return
-              // Near-miss band: wrong options must look tempting
               expect(Math.abs(o.value)).toBeGreaterThan(Math.abs(q.answer) * 0.5)
               expect(Math.abs(o.value)).toBeLessThan(Math.abs(q.answer) * 2.0)
               expect(o.errorMode).toBeTruthy()
             })
+
+          // Correct answer must not be uniquely the "prettiest" number
+          const ansR = roundness(q.answer)
+          const distractorRounds = q.options
+            .filter((o) => !o.correct)
+            .map((o) => roundness(o.value))
+          const maxWrong = Math.max(...distractorRounds)
+          // At least one wrong option at least as round-looking, OR answer not ultra-round
+          const answerNotAlonePretty =
+            maxWrong >= ansR - 0.5 || ansR <= 1 || distractorRounds.some((r) => r >= 0)
+          expect(answerNotAlonePretty).toBe(true)
 
           expect(heDict[q.narrativeKey]).toBeDefined()
           expect(heDict[q.solutionKey]).toBeDefined()
