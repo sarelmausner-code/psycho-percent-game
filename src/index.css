@@ -299,6 +299,20 @@ button {
   animation: recordPop var(--dur-slow) var(--ease-back);
 }
 
+.fail-banner {
+  background: var(--no-bg);
+  color: var(--no);
+  font-weight: 800;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #f5c2c5;
+  z-index: 1;
+  position: relative;
+  max-width: 100%;
+  line-height: 1.4;
+  font-size: 0.95rem;
+}
+
 /* —— Map —— */
 .map-screen {
   gap: 12px;

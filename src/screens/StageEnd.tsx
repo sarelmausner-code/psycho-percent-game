@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { bootAudio } from '../audio/engine'
-import { playStageClear } from '../audio/sfx'
+import { playFailSoft, playStageClear } from '../audio/sfx'
 import { Num } from '../components/Num'
 import { t } from '../i18n/t'
 import { useGameStore, type StageSummary } from '../store/gameStore'
@@ -43,7 +43,8 @@ function SummaryBody({ result }: { result: StageSummary }) {
   const [displayScore, setDisplayScore] = useState(200)
 
   useEffect(() => {
-    playStageClear()
+    if (result.passed) playStageClear()
+    else playFailSoft()
     setShownStars(0)
     setDisplayScore(200)
     const timers: number[] = []
@@ -66,32 +67,45 @@ function SummaryBody({ result }: { result: StageSummary }) {
       timers.forEach(clearTimeout)
       cancelAnimationFrame(raf)
     }
-  }, [result.score, result.stars])
+  }, [result.score, result.stars, result.passed])
 
   return (
     <>
-      <div className="confetti" aria-hidden>
-        {Array.from({ length: 18 }, (_, i) => (
-          <span
-            key={i}
-            className={`confetti-bit c${i % 6}`}
-            style={{ left: `${4 + i * 5}%`, animationDelay: `${i * 35}ms` }}
-          />
-        ))}
-      </div>
+      {result.passed && (
+        <div className="confetti" aria-hidden>
+          {Array.from({ length: 18 }, (_, i) => (
+            <span
+              key={i}
+              className={`confetti-bit c${i % 6}`}
+              style={{ left: `${4 + i * 5}%`, animationDelay: `${i * 35}ms` }}
+            />
+          ))}
+        </div>
+      )}
 
-      <h1 className="display-title end-title">{t('end.title')}</h1>
+      <h1 className="display-title end-title">
+        {result.passed ? t('end.title') : t('end.fail_title')}
+      </h1>
 
       <p className="end-stage-name">
         {t(result.worldTitleKey)} · {t('map.stage_n', { n: result.stageId })} ·{' '}
         {t(result.stageTitleKey)}
       </p>
 
-      {result.wasNewRecord && (
+      {!result.passed && (
+        <div className="fail-banner">
+          {t('end.fail_banner', {
+            pct: Math.round(result.accuracy * 100),
+            need: 50,
+          })}
+        </div>
+      )}
+
+      {result.passed && result.wasNewRecord && (
         <div className="record-banner">{t('end.new_record')}</div>
       )}
 
-      {result.unlockedNext && result.nextStageId && (
+      {result.passed && result.unlockedNext && result.nextStageId && (
         <div className="unlock-banner">
           🔓 {t('end.unlocked', { n: result.nextStageId })}
         </div>
@@ -104,6 +118,11 @@ function SummaryBody({ result }: { result: StageSummary }) {
           </span>
         ))}
       </div>
+      {!result.passed && (
+        <p className="end-best" style={{ zIndex: 1, position: 'relative' }}>
+          {t('end.fail_stars')}
+        </p>
+      )}
 
       <div className="end-card end-card-fun">
         <p className="end-label">{t('end.score_label')}</p>
@@ -275,7 +294,7 @@ export function StageEnd() {
     <div className="screen end">
       <SummaryBody result={stageSummary} />
       <div className="end-actions">
-        {stageSummary.nextStageId != null && (
+        {stageSummary.passed && stageSummary.nextStageId != null && (
           <button type="button" className="btn-play btn-play-fun" onClick={onNext}>
             <span className="btn-shine" aria-hidden />
             {t('end.next', { n: stageSummary.nextStageId })}
@@ -283,11 +302,17 @@ export function StageEnd() {
         )}
         <button
           type="button"
-          className={stageSummary.nextStageId != null ? 'btn-secondary' : 'btn-play btn-play-fun'}
+          className={
+            stageSummary.passed && stageSummary.nextStageId != null
+              ? 'btn-secondary'
+              : 'btn-play btn-play-fun'
+          }
           onClick={onReplay}
         >
-          {stageSummary.nextStageId == null && <span className="btn-shine" aria-hidden />}
-          {t('end.replay')}
+          {!(stageSummary.passed && stageSummary.nextStageId != null) && (
+            <span className="btn-shine" aria-hidden />
+          )}
+          {stageSummary.passed ? t('end.replay') : t('end.retry')}
         </button>
         <button
           type="button"

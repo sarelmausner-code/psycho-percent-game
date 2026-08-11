@@ -119,6 +119,10 @@
   "play.ramp": "הקושי עולה…",
 
   "end.title": "כל הכבוד! 🎉",
+  "end.fail_title": "כמעט… נסו שוב",
+  "end.fail_banner": "דיוק {pct}% — צריך לפחות {need}% כדי לפתוח את השלב הבא",
+  "end.fail_stars": "0 כוכבים · השלב הבא עדיין נעול",
+  "end.retry": "נסו שוב 💪",
   "end.score_label": "מדד אימון",
   "end.accuracy": "דיוק {pct}%",
   "end.accuracy_short": "דיוק",

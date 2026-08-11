@@ -69,10 +69,29 @@ export function toTrainingScore(totalPoints: number, accuracy: number): number {
   return Math.max(200, Math.min(800, raw))
 }
 
-export function starsForStage(accuracy: number, avgMs: number, avgTargetSec: number): 1 | 2 | 3 {
+/** Minimum accuracy to pass a stage and unlock the next one. */
+export const PASS_ACCURACY = 0.5
+
+/**
+ * Stars for a finished stage.
+ * 0 = failed (under 50% correct) — next stage stays locked
+ * 1 = passed
+ * 2 = high accuracy (≥80%)
+ * 3 = high accuracy + fast enough
+ */
+export function starsForStage(
+  accuracy: number,
+  avgMs: number,
+  avgTargetSec: number,
+): 0 | 1 | 2 | 3 {
+  if (accuracy < PASS_ACCURACY) return 0
   if (accuracy >= 0.8 && avgMs <= avgTargetSec * 1000 * 0.7) return 3
   if (accuracy >= 0.8) return 2
   return 1
+}
+
+export function didPassStage(accuracy: number): boolean {
+  return accuracy >= PASS_ACCURACY
 }
 
 const BANK: Record<PraiseKind, string[]> = {

@@ -15,6 +15,7 @@ import {
 } from '../engine/worlds'
 import {
   comboMultiplier,
+  didPassStage,
   pickPraiseDetailed,
   pointsForAnswer,
   starsForStage,
@@ -48,7 +49,8 @@ export interface StageSummary {
   total: number
   points: number
   score: number
-  stars: 1 | 2 | 3
+  stars: 0 | 1 | 2 | 3
+  passed: boolean
   maxCombo: number
   mult: number
   wasNewRecord: boolean
@@ -156,6 +158,7 @@ function buildSummary(input: {
     }
   })
 
+  const stars = starsForStage(accuracy, avgMs, avgTarget)
   return {
     worldId: input.worldId,
     stageId: input.stageId,
@@ -167,10 +170,11 @@ function buildSummary(input: {
     total: input.answers.length || input.questions.length,
     points: input.totalPoints,
     score,
-    stars: starsForStage(accuracy, avgMs, avgTarget),
+    stars,
+    passed: didPassStage(accuracy),
     maxCombo: input.maxCombo,
     mult: comboMultiplier(input.maxCombo),
-    wasNewRecord: score > input.prevBest,
+    wasNewRecord: score > input.prevBest && didPassStage(accuracy),
     unlockedNext: input.unlockedNext,
     nextStageId: input.nextStageId,
     lightningCount: recap.filter((r) => r.speedTier === 'lightning').length,
@@ -447,41 +451,49 @@ async function finishStage() {
       ? s.questions.reduce((a, q) => a + q.timeTargetSec, 0) / s.questions.length
       : 35
   const stars = starsForStage(accuracy, avgMs, avgTarget)
+  const passed = didPassStage(accuracy)
 
   const key = stageKey(worldId, stageId)
   const prevStars = { ...s.starsByKey }
+  // Never overwrite a previous pass with a fail (0 stars)
   const newStarsForStage = Math.max(prevStars[key] ?? 0, stars)
   const starsByKey = { ...prevStars, [key]: newStarsForStage }
-  const best = Math.max(prevBest, score)
+  const best = passed ? Math.max(prevBest, score) : prevBest
 
   const maxStage = world?.stages.length ?? 8
   const nextId = stageId < maxStage ? stageId + 1 : null
-  const unlockedNext =
-    nextId != null &&
-    (prevStars[key] ?? 0) < 1 &&
-    newStarsForStage >= 1
+  // Next stage only if this run (or a previous one) has ≥1 star = ≥50% accuracy
+  const canOpenNext = newStarsForStage >= 1
+  const unlockedNextThisRun =
+    passed && nextId != null && (prevStars[key] ?? 0) < 1
 
   const stageSummary = buildSummary({
     answers: s.answers,
     questions: s.questions,
     totalPoints: s.totalPoints,
     maxCombo: s.maxCombo,
-    bestScore: best,
+    bestScore: Math.max(prevBest, best),
     prevBest,
     worldId,
     stageId,
     stageTitleKey: def?.titleKey ?? 'pct.stage.1.title',
     worldTitleKey: world?.titleKey ?? 'world.percentages.title',
-    unlockedNext: Boolean(
-      unlockedNext || (nextId && isStageUnlocked(worldId, nextId, starsByKey)),
-    ),
-    nextStageId:
-      nextId && isStageUnlocked(worldId, nextId, starsByKey) ? nextId : null,
+    unlockedNext: Boolean(unlockedNextThisRun),
+    nextStageId: nextId && canOpenNext ? nextId : null,
   })
-  stageSummary.wasNewRecord = score > prevBest
+  stageSummary.passed = passed
+  stageSummary.stars = stars
+  stageSummary.wasNewRecord = passed && score > prevBest
 
   try {
-    await saveStageResult({ worldId, stageId, stars, score, bestScore: best })
+    // Save attempt; stars only increase, so fails don't wipe a prior unlock
+    await saveStageResult({
+      worldId,
+      stageId,
+      stars,
+      score: passed ? score : prevBest,
+      bestScore: best,
+    })
   } catch (e) {
     console.error('saveStageResult failed', e)
   }
